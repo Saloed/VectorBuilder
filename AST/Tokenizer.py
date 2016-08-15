@@ -1,4 +1,5 @@
 from AST.Token import Token
+from AST.TokenMap import token_map
 
 
 def ast_to_list(ast):
@@ -14,8 +15,7 @@ def tokenize(root, token_type, parent, pos, nodes, leafs):
     if token_type is None:
         token_type = root.__class__.__name__
 
-    # TODO add token indexes or another idea
-    token = Token(token_type, index,
+    token = Token(token_type, token_map[token_type],
                   parent, pos)
 
     children = root.children()
