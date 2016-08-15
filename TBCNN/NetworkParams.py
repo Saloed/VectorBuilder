@@ -1,14 +1,14 @@
-num_features = 30
+NUM_FEATURES = 30
 
 margin = 1
 learn_rate = 0.0025  # 0.0001
 beta = .0001
 momentum = 0.1
 
-num_convolution = 600  # 50
-num_discriminative = 600  # 50
-num_out_layer = 104
-num_pooling = 3
+NUM_CONVOLUTION = 600  # 50
+NUM_DISCRIMINATIVE = 600  # 50
+NUM_OUT_LAYER = 104
+NUM_POOLING = 3
 
 
 class Params:

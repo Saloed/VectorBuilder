@@ -30,12 +30,12 @@ def init_prepared_params():
 
     np.random.seed(314)
     # random init weights
-    pre_weights, pre_w_left_area = init_params(pre_weights, amount=num_features * num_features)
-    pre_weights, pre_w_right_area = init_params(pre_weights, amount=num_features * num_features)
+    pre_weights, pre_w_left_area = init_params(pre_weights, amount=NUM_FEATURES * NUM_FEATURES)
+    pre_weights, pre_w_right_area = init_params(pre_weights, amount=NUM_FEATURES * NUM_FEATURES)
     # random init biases
-    pre_biases, pre_b_token_area = init_params(pre_biases, amount=num_features * token_amount,
+    pre_biases, pre_b_token_area = init_params(pre_biases, amount=NUM_FEATURES * token_amount,
                                                upper=0.4, lower=0.6)
-    pre_biases, pre_b_construct_area = init_params(pre_biases, amount=num_features)
+    pre_biases, pre_b_construct_area = init_params(pre_biases, amount=NUM_FEATURES)
 
     # load prepared params
     pre_params = P.load(open('TBCNN/preparam', 'rb'), encoding='latin1')
@@ -62,26 +62,26 @@ def init_prepared_params():
     biases, b_construct_area = init_params(biases, new_weights=pre_b_construct)
 
     # combine embeddings and encoded
-    w_ae = (np.eye(num_features) / 2).reshape(-1)
-    w_emb = (np.eye(num_features) / 2).reshape(-1)
+    w_ae = (np.eye(NUM_FEATURES) / 2).reshape(-1)
+    w_emb = (np.eye(NUM_FEATURES) / 2).reshape(-1)
 
     weights, w_comb_ae_area = init_params(weights, new_weights=w_ae)
     weights, w_comb_emb_area = init_params(weights, new_weights=w_emb)
 
     # convolution
-    weights, w_conv_root_area = init_params(weights, amount=num_features * num_convolution)
-    weights, w_conv_left_area = init_params(weights, amount=num_features * num_convolution)
-    weights, w_conv_right_area = init_params(weights, amount=num_features * num_convolution)
-    biases, b_conv_area = init_params(biases, amount=num_convolution)
+    weights, w_conv_root_area = init_params(weights, amount=NUM_FEATURES * NUM_CONVOLUTION)
+    weights, w_conv_left_area = init_params(weights, amount=NUM_FEATURES * NUM_CONVOLUTION)
+    weights, w_conv_right_area = init_params(weights, amount=NUM_FEATURES * NUM_CONVOLUTION)
+    biases, b_conv_area = init_params(biases, amount=NUM_CONVOLUTION)
 
     # discriminative layer
-    weights, w_dis_area = init_params(weights, amount=num_pooling * num_convolution * num_discriminative)
-    biases, b_dis_area = init_params(biases, amount=num_discriminative)
+    weights, w_dis_area = init_params(weights, amount=NUM_POOLING * NUM_CONVOLUTION * NUM_DISCRIMINATIVE)
+    biases, b_dis_area = init_params(biases, amount=NUM_DISCRIMINATIVE)
 
     # output layer
-    weights, w_out_area = init_params(weights, amount=num_discriminative * num_out_layer,
+    weights, w_out_area = init_params(weights, amount=NUM_DISCRIMINATIVE * NUM_OUT_LAYER,
                                       upper=.0002, lower=-.0002)
-    biases, b_out_area = init_params(biases, new_weights=np.zeros((num_out_layer, 1)))
+    biases, b_out_area = init_params(biases, new_weights=np.zeros((NUM_OUT_LAYER, 1)))
 
     weights = weights.reshape((-1, 1))
     biases = biases.reshape((-1, 1))
@@ -113,8 +113,8 @@ def init_prepared_params():
 
     embeddings = []
     for (index, token) in enumerate(token_map):
-        target = index * num_features
-        area = range(target, target + num_features)
+        target = index * NUM_FEATURES
+        area = range(target, target + NUM_FEATURES)
         embeddings.insert(index, shared(biases[area], 'emb_' + token))
 
     biases = shared(biases, 'B')
