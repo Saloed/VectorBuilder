@@ -112,7 +112,7 @@ def init_prepared_params():
     b_out = shared(biases[b_out_area], 'B_out')
 
     embeddings = []
-    for (index, token) in enumerate(token_map):
+    for token, index in token_map.items():
         target = index * NUM_FEATURES
         area = range(target, target + NUM_FEATURES)
         embeddings.insert(index, shared(biases[area], 'emb_' + token))
