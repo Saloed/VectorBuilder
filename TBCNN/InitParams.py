@@ -97,7 +97,7 @@ def init_prepared_params():
     w_conv_left = shared(weights[w_conv_left_area], 'W_conv_left')
     w_conv_right = shared(weights[w_conv_right_area], 'W_conv_right')
 
-    w_dis = shared(weights[w_dis_area], 'W_dis')
+    w_dis = weights[w_dis_area]
 
     w_out = shared(weights[w_out_area], 'W_out')
 
@@ -110,6 +110,11 @@ def init_prepared_params():
     b_dis = shared(biases[b_dis_area], 'B_dis')
 
     b_out = shared(biases[b_out_area], 'B_out')
+
+    ows = NUM_DISCRIMINATIVE * NUM_CONVOLUTION
+    w_dis_top = shared(w_dis[0:ows], 'w_dis_top')
+    w_dis_left = shared(w_dis[ows:2 * ows], 'w_dis_left')
+    w_dis_right = shared(w_dis[2 * ows:3 * ows], 'w_dis_right')
 
     embeddings = []
     for token, index in token_map.items():
@@ -124,7 +129,8 @@ def init_prepared_params():
                   w_left, w_right,
                   w_comb_ae, w_comb_emb,
                   w_conv_root, w_conv_left, w_conv_right,
-                  w_dis, w_out,
+                  w_dis_top, w_dis_left, w_dis_right,
+                  w_out,
                   b_token, b_construct,
                   b_conv, b_dis, b_out,
                   embeddings)

@@ -1,6 +1,8 @@
+import theano.tensor.nnet
+
 from AST.Tokenizer import ast_to_list
-from TBCNN.Connection import Connection
-from TBCNN.Layer import Layer
+from TBCNN.Connection import Connection, PoolConnection
+from TBCNN.Layer import Layer, PoolLayer
 from TBCNN.NetworkParams import *
 
 
@@ -79,5 +81,91 @@ def construct_network(nodes, parameters: Params, pool_cutoff):
         layers[i] = cmb_layer = Layer(None, "combination_" + str(i - leaf_amount))
         Connection(ae_layer, cmb_layer, parameters.w_comb_ae)
         Connection(emb_layer, cmb_layer, parameters.w_comb_emb)
+
+    pool_top = PoolLayer('pool_top', NUM_CONVOLUTION)
+    pool_left = PoolLayer('pool_left', NUM_CONVOLUTION)
+    pool_right = PoolLayer('pool_right', NUM_CONVOLUTION)
+
+    queue = [(nodes_amount - 1, None)]
+    layer_cnt = 0
+
+    cur_len = len(queue)
+    while cur_len != 0:
+        next_queue = []
+        for (i, info) in queue:
+
+            cur_layer = layers[i]
+            cur_node = nodes[i]
+
+            conv_layer = Layer(parameters.b_conv, "convolve_" + str(i), NUM_CONVOLUTION)
+            layers.append(conv_layer)
+
+            Connection(cur_layer, conv_layer, parameters.w_conv_root)
+
+            child_num = len(cur_node.children)
+
+            if layer_cnt < pool_cutoff:
+                PoolConnection(conv_layer, pool_top)
+            else:
+                if info == 'l' or info == 'lr':
+                    PoolConnection(conv_layer, pool_left)
+                if info == 'r' or info == 'lr':
+                    PoolConnection(conv_layer, pool_right)
+
+            for child in cur_node.children:
+                child_node = nodes[child]
+                child_layer = layers[child]
+
+                if layer_cnt != 0 and info != 'u':
+                    child_info = info
+                else:
+                    root_child_num = len(cur_node.children) - 1
+                    if root_child_num == 0:
+                        child_info = 'u'
+                    elif child_node.pos <= root_child_num / 2.0:
+                        child_info = 'l'
+                    else:
+                        child_info = 'r'
+
+                next_queue.append((child, child_info))
+
+                if child_num == 1:
+                    left_w = .5
+                    right_w = .5
+                else:
+                    right_w = child_node.pos / (child_num - 1.0)
+                    left_w = 1 - right_w
+                if left_w != 0:
+                    Connection(child_layer, conv_layer, parameters.w_conv_left, left_w)
+                if right_w != 0:
+                    Connection(child_layer, conv_layer, parameters.w_conv_right, right_w)
+
+            queue = next_queue
+
+        layer_cnt += 1
+        cur_len = len(queue)
+
+    for i in range(leaf_amount, leaf_amount + not_leaf_amount):
+        pos = i + 2 * not_leaf_amount
+        tmp = layers[i]
+        layers[i] = layers[pos]
+        layers[pos] = tmp
+
+    dis_layer = Layer(parameters.b_dis, 'discriminative', NUM_DISCRIMINATIVE)
+
+    out_layer = Layer(parameters.b_out, "softmax", NUM_OUT_LAYER, theano.tensor.nnet.softmax)
+
+    Connection(pool_top, dis_layer, parameters.w_dis_top)
+    Connection(pool_left, dis_layer, parameters.w_dis_left)
+    Connection(pool_right, dis_layer, parameters.w_dis_right)
+
+    Connection(dis_layer, out_layer, parameters.w_out)
+
+    layers.append(pool_top)
+    layers.append(pool_left)
+    layers.append(pool_right)
+
+    layers.append(dis_layer)
+    layers.append(out_layer)
 
     return layers

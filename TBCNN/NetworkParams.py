@@ -10,42 +10,18 @@ NUM_DISCRIMINATIVE = 600  # 50
 NUM_OUT_LAYER = 104
 NUM_POOLING = 3
 
+# unknown parameter
+# todo fix this shit
+NUM_DATA = 1
+
 
 class Params:
-    w_left = None
-    w_right = None
-
-    w_comb_ae = None
-    w_comb_emb = None
-
-    w_conv_root = None
-    w_conv_left = None
-    w_conv_right = None
-
-    w_dis = None
-
-    w_out = None
-
-    b_token = None
-
-    b_construct = None
-
-    b_conv = None
-
-    b_dis = None
-
-    b_out = None
-
-    biases = None
-    weights = None
-
-    embeddings = None
-
     def __init__(self, weights, biases,
                  w_left, w_right,
                  w_comb_ae, w_comb_emb,
                  w_conv_root, w_conv_left, w_conv_right,
-                 w_dis, w_out,
+                 w_dis_top, w_dis_left, w_dis_right,
+                 w_out,
                  b_token, b_construct,
                  b_conv, b_dis, b_out,
                  embeddings):
@@ -62,7 +38,10 @@ class Params:
         self.w_conv_left = w_conv_left
         self.w_conv_right = w_conv_right
 
-        self.w_dis = w_dis
+        self.w_dis_top = w_dis_top
+        self.w_dis_left = w_dis_left
+        self.w_dis_right = w_dis_right
+
         self.w_out = w_out
 
         self.b_token = b_token
