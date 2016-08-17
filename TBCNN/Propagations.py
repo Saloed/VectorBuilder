@@ -7,5 +7,6 @@ def forward_propagation(network: list):
         last_layer = layer
         for con in layer.forward_connection:
             con.f_prop()
-
+        print(layer.forward())
+        print("###################")
     return last_layer.forward()

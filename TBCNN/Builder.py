@@ -4,7 +4,8 @@ from AST.Tokenizer import ast_to_list
 from TBCNN.Connection import Connection, PoolConnection
 from TBCNN.Layer import Layer, PoolLayer
 from TBCNN.NetworkParams import *
-
+import numpy as np
+import theano.tensor as T
 
 def compute_leaf_num(root, nodes, depth=0):
     if len(root.children) == 0:
@@ -155,7 +156,13 @@ def construct_network(nodes, parameters: Params, pool_cutoff):
 
     dis_layer = Layer(parameters.b_dis, 'discriminative', NUM_DISCRIMINATIVE)
 
-    out_layer = Layer(parameters.b_out, "softmax", NUM_OUT_LAYER, theano.tensor.nnet.softmax)
+    def softmax(z):
+        z -= T.max(z, axis=0)  # extract the maximal value for each dataset to prevent numerical overflow
+        z = np.e ** z
+        sumbycol = T.sum(z, axis=0)
+        return z / sumbycol
+
+    out_layer = Layer(parameters.b_out, "softmax", NUM_OUT_LAYER, softmax)
 
     Connection(pool_top, dis_layer, parameters.w_dis_top)
     Connection(pool_left, dis_layer, parameters.w_dis_left)
