@@ -12,6 +12,7 @@ class Layer:
         self.bias = bias
 
         self.name = name
+        self.is_pool = is_pool
 
         self.feature_amount = feature_amount
         if not is_pool:
@@ -23,18 +24,22 @@ class Layer:
         self.back_connection = []
 
         self.activation = activation
-        if not is_pool:
-            if bias is not None:
+
+        # self.forward = function([])
+
+    def f_prop(self):
+        self.forward()
+
+    def build_functions(self):
+        if not self.is_pool:
+            if self.bias is not None:
                 self.forward = function([], self.activation(self.z + self.bias), updates=[
-                    (self.z, self.z + bias)
+                    (self.z, self.z + self.bias)
                 ])
             else:
                 self.forward = function([], self.activation(self.z))
         else:
             self.forward = lambda: np.max(self.z, axis=0)
-
-    def f_prop(self):
-        self.forward()
 
 
 class PoolLayer(Layer):

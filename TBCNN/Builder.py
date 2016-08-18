@@ -1,11 +1,9 @@
-import theano.tensor.nnet
+import theano.tensor as T
 
 from AST.Tokenizer import ast_to_list
 from TBCNN.Connection import Connection, PoolConnection
 from TBCNN.Layer import Layer, PoolLayer
 from TBCNN.NetworkParams import *
-import numpy as np
-import theano.tensor as T
 
 
 def compute_leaf_num(root, nodes, depth=0):
@@ -175,5 +173,11 @@ def construct_network(nodes, parameters: Params, pool_cutoff):
 
     layers.append(dis_layer)
     layers.append(out_layer)
+
+    for lay in layers:
+        lay.build_functions()
+    for lay in layers:
+        for con in lay.forward_connection:
+            con.build_functions()
 
     return layers
