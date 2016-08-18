@@ -3,7 +3,7 @@ import theano.tensor as T
 from theano import function
 from theano import shared
 
-from TBCNN.NetworkParams import NUM_FEATURES, NUM_DATA
+from TBCNN.NetworkParams import NUM_FEATURES, BATCH_SIZE
 
 
 class Layer:
@@ -15,7 +15,7 @@ class Layer:
 
         self.feature_amount = feature_amount
         if not is_pool:
-            self.z = shared(np.zeros((feature_amount, NUM_DATA)))
+            self.z = shared(np.zeros((feature_amount, BATCH_SIZE)))
         else:
             self.z = []
 

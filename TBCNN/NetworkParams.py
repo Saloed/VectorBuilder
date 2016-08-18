@@ -13,10 +13,7 @@ NUM_POOLING = 3
 # test parameter
 DONT_MAKE_CONV = False
 
-
-# unknown parameter
-# todo fix this shit
-NUM_DATA = 1
+BATCH_SIZE = 1
 
 
 class Params:
