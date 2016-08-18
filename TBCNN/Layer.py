@@ -6,9 +6,14 @@ from theano import shared
 from TBCNN.NetworkParams import NUM_FEATURES, BATCH_SIZE
 
 
+def unknown_relu(x):
+    return x * (x > 0)
+
+
 class Layer:
     def __init__(self, bias, name="", feature_amount=NUM_FEATURES,
-                 activation=T.tanh, is_pool=False):
+                 activation=unknown_relu,
+                 is_pool=False):
         self.bias = bias
 
         self.name = name
@@ -33,9 +38,10 @@ class Layer:
     def build_functions(self):
         if not self.is_pool:
             if self.bias is not None:
-                self.forward = function([], self.activation(self.z + self.bias), updates=[
-                    (self.z, self.z + self.bias)
-                ])
+                if len(self.back_connection) == 0:
+                    self.forward = function([], self.bias)
+                else:
+                    self.forward = function([], self.activation(self.z + self.bias))
             else:
                 self.forward = function([], self.activation(self.z))
         else:

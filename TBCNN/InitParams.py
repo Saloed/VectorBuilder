@@ -1,25 +1,30 @@
 import _pickle as P
 
 import numpy as np
+from numpy.random import RandomState
 from theano import shared
 
 from AST.TokenMap import token_map
 from TBCNN.NetworkParams import *
 
 
-def init_params(old_weights, amount=None, new_weights=None, upper=None, lower=None):
-    old_len = len(old_weights)
-    if new_weights is not None:
-        new_weights = np.array(new_weights)
-        amount = len(new_weights)
-        old_weights = np.concatenate((old_weights, new_weights.reshape(-1)))
-    else:
-        if upper is None or lower is None:
-            upper = 0.02
-            lower = -.02
-        tmp_weights = np.random.uniform(lower, upper, amount)
-        old_weights = np.concatenate((old_weights, tmp_weights.reshape(-1)))
-    return old_weights, range(old_len, old_len + amount)
+class Initializer:
+    def __init__(self):
+        self.randomizer = RandomState(314)
+
+    def init_params(self, old_weights, amount=None, new_weights=None, upper=None, lower=None):
+        old_len = len(old_weights)
+        if new_weights is not None:
+            new_weights = np.array(new_weights)
+            amount = len(new_weights)
+            old_weights = np.concatenate((old_weights, new_weights.reshape(-1)))
+        else:
+            if upper is None or lower is None:
+                upper = 0.02
+                lower = -0.02
+            tmp_weights = self.randomizer.uniform(lower, upper, amount)
+            old_weights = np.concatenate((old_weights, tmp_weights.reshape(-1)))
+        return old_weights, range(old_len, old_len + amount)
 
 
 def init_prepared_params():
@@ -28,14 +33,15 @@ def init_prepared_params():
     pre_weights = np.array([])
     pre_biases = np.array([])
 
-    np.random.seed(314)
+    init = Initializer()
+
     # random init weights
-    pre_weights, pre_w_left_area = init_params(pre_weights, amount=NUM_FEATURES * NUM_FEATURES)
-    pre_weights, pre_w_right_area = init_params(pre_weights, amount=NUM_FEATURES * NUM_FEATURES)
+    pre_weights, pre_w_left_area = init.init_params(pre_weights, amount=NUM_FEATURES * NUM_FEATURES)
+    pre_weights, pre_w_right_area = init.init_params(pre_weights, amount=NUM_FEATURES * NUM_FEATURES)
     # random init biases
-    pre_biases, pre_b_token_area = init_params(pre_biases, amount=NUM_FEATURES * token_amount,
-                                               upper=0.4, lower=0.6)
-    pre_biases, pre_b_construct_area = init_params(pre_biases, amount=NUM_FEATURES)
+    pre_biases, pre_b_token_area = init.init_params(pre_biases, amount=NUM_FEATURES * token_amount,
+                                                    upper=0.4, lower=0.6)
+    pre_biases, pre_b_construct_area = init.init_params(pre_biases, amount=NUM_FEATURES)
 
     # load prepared params
     pre_params = P.load(open('TBCNN/preparam', 'rb'), encoding='latin1')
@@ -54,34 +60,34 @@ def init_prepared_params():
     biases = np.array([])
 
     # embeddings
-    biases, b_token_area = init_params(biases, new_weights=pre_b_token)
+    biases, b_token_area = init.init_params(biases, new_weights=pre_b_token)
 
     # left/right weights and biases (auto encoder)
-    weights, w_left_area = init_params(weights, new_weights=pre_w_left)
-    weights, w_right_area = init_params(weights, new_weights=pre_w_right)
-    biases, b_construct_area = init_params(biases, new_weights=pre_b_construct)
+    weights, w_left_area = init.init_params(weights, new_weights=pre_w_left)
+    weights, w_right_area = init.init_params(weights, new_weights=pre_w_right)
+    biases, b_construct_area = init.init_params(biases, new_weights=pre_b_construct)
 
     # combine embeddings and encoded
     w_ae = (np.eye(NUM_FEATURES) / 2).reshape(-1)
     w_emb = (np.eye(NUM_FEATURES) / 2).reshape(-1)
 
-    weights, w_comb_ae_area = init_params(weights, new_weights=w_ae)
-    weights, w_comb_emb_area = init_params(weights, new_weights=w_emb)
+    weights, w_comb_ae_area = init.init_params(weights, new_weights=w_ae)
+    weights, w_comb_emb_area = init.init_params(weights, new_weights=w_emb)
 
     # convolution
-    weights, w_conv_root_area = init_params(weights, amount=NUM_FEATURES * NUM_CONVOLUTION)
-    weights, w_conv_left_area = init_params(weights, amount=NUM_FEATURES * NUM_CONVOLUTION)
-    weights, w_conv_right_area = init_params(weights, amount=NUM_FEATURES * NUM_CONVOLUTION)
-    biases, b_conv_area = init_params(biases, amount=NUM_CONVOLUTION)
+    weights, w_conv_root_area = init.init_params(weights, amount=NUM_FEATURES * NUM_CONVOLUTION)
+    weights, w_conv_left_area = init.init_params(weights, amount=NUM_FEATURES * NUM_CONVOLUTION)
+    weights, w_conv_right_area = init.init_params(weights, amount=NUM_FEATURES * NUM_CONVOLUTION)
+    biases, b_conv_area = init.init_params(biases, amount=NUM_CONVOLUTION)
 
     # discriminative layer
-    weights, w_dis_area = init_params(weights, amount=NUM_POOLING * NUM_CONVOLUTION * NUM_DISCRIMINATIVE)
-    biases, b_dis_area = init_params(biases, amount=NUM_DISCRIMINATIVE)
+    weights, w_dis_area = init.init_params(weights, amount=NUM_POOLING * NUM_CONVOLUTION * NUM_DISCRIMINATIVE)
+    biases, b_dis_area = init.init_params(biases, amount=NUM_DISCRIMINATIVE)
 
     # output layer
-    weights, w_out_area = init_params(weights, amount=NUM_DISCRIMINATIVE * NUM_OUT_LAYER,
-                                      upper=.0002, lower=-.0002)
-    biases, b_out_area = init_params(biases, new_weights=np.zeros((NUM_OUT_LAYER, 1)))
+    weights, w_out_area = init.init_params(weights, amount=NUM_DISCRIMINATIVE * NUM_OUT_LAYER,
+                                           upper=.0002, lower=-.0002)
+    biases, b_out_area = init.init_params(biases, new_weights=np.zeros((NUM_OUT_LAYER, 1)))
 
     weights = weights.reshape((-1, 1))
     biases = biases.reshape((-1, 1))

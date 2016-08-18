@@ -82,7 +82,7 @@ def construct_network(nodes, parameters: Params, pool_cutoff):
         Connection(ae_layer, cmb_layer, parameters.w_comb_ae)
         Connection(emb_layer, cmb_layer, parameters.w_comb_emb)
 
-    if (DONT_MAKE_CONV): return layers
+    if DONT_MAKE_CONV: return layers
 
     pool_top = PoolLayer('pool_top', NUM_CONVOLUTION)
     pool_left = PoolLayer('pool_left', NUM_CONVOLUTION)
