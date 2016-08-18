@@ -7,6 +7,7 @@ from TBCNN.NetworkParams import *
 import numpy as np
 import theano.tensor as T
 
+
 def compute_leaf_num(root, nodes, depth=0):
     if len(root.children) == 0:
         root.leaf_num = 1
@@ -157,10 +158,8 @@ def construct_network(nodes, parameters: Params, pool_cutoff):
     dis_layer = Layer(parameters.b_dis, 'discriminative', NUM_DISCRIMINATIVE)
 
     def softmax(z):
-        z -= T.max(z, axis=0)  # extract the maximal value for each dataset to prevent numerical overflow
-        z = np.e ** z
-        sumbycol = T.sum(z, axis=0)
-        return z / sumbycol
+        e_z = T.exp(z - z.max(axis=0, keepdims=True))
+        return e_z / e_z.sum(axis=0, keepdims=True)
 
     out_layer = Layer(parameters.b_out, "softmax", NUM_OUT_LAYER, softmax)
 

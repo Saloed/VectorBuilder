@@ -31,7 +31,6 @@ class Layer:
             else:
                 self.forward = function([], self.activation(self.z))
         else:
-
             self.forward = lambda: np.max(self.z, axis=0)
 
     def f_prop(self):
