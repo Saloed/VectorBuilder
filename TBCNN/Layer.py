@@ -1,46 +1,69 @@
 import numpy as np
+import theano
+import theano.printing as tp
 import theano.tensor as T
 from theano import function
 from theano import shared
 
 from TBCNN.NetworkParams import NUM_FEATURES, BATCH_SIZE
 
-
-def unknown_relu(x):
-    return x * (x > 0)
+file = open('layer_activ.txt', mode='w')
+fun_graph = open('function.png', mode='w')
 
 
 class Layer:
     def __init__(self, bias, name="", feature_amount=NUM_FEATURES,
-                 activation=unknown_relu,
+                 activation=T.nnet.relu,
                  is_pool=False):
         self.bias = bias
-
-        # print("\n\n" + name + "\n")
-        # if bias is not None:
-        #     print(self.bias)
-        #     print(self.bias.eval())
-        # else:
-        #     print("bias is none")
 
         self.name = name
         self.is_pool = is_pool
 
         self.feature_amount = feature_amount
-        if not is_pool:
-            self.z = shared(np.zeros((feature_amount, BATCH_SIZE)))
-        else:
-            self.z = []
 
         self.forward_connection = []
         self.back_connection = []
 
         self.activation = activation
 
-        # self.forward = function([])
+        self.initialized = False
+
+        def test_activ(x):
+            print("\n\n", name, file=file)
+            print("bias", file=file)
+            if self.bias is not None:
+                print(self.bias.eval(), file=file)
+            else:
+                print("None", file=file)
+            if not is_pool:
+                print("input", file=file)
+                print(self.z, file=file)
+
+            print("\n", file=file)
+            print(x, file=file)
+            r = T.nnet.relu(x)
+            print("\n", file=file)
+            print(r, file=file)
+            return r
+
+        if self.name != "softmax":
+            self.activation = test_activ
 
     def f_prop(self):
         self.forward()
+
+    def z_fun(self):
+        if not self.is_pool:
+            self.z = T.zeros((self.feature_amount, BATCH_SIZE))
+            for c in self.back_connection:
+                self.z += c.forward()
+        else:
+            self.z = []
+            for c in self.back_connection:
+                self.z.append(c.forward())
+
+        return self.z
 
     def build_functions(self):
         if not self.is_pool:
@@ -48,11 +71,13 @@ class Layer:
                 if len(self.back_connection) == 0:
                     self.forward = function([], self.bias)
                 else:
-                    self.forward = function([], self.activation(self.z + self.bias))
+                    self.forward = function([], self.activation(self.z_fun() + self.bias))
             else:
-                self.forward = function([], self.activation(self.z))
+                self.forward = function([], self.activation(self.z_fun()))
         else:
-            self.forward = lambda: np.max(self.z, axis=0)
+            self.forward = lambda: np.max(self.z_fun(), axis=0)
+
+        self.initialized = True
 
 
 class PoolLayer(Layer):

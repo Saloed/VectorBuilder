@@ -41,7 +41,7 @@ def construct_from_ast(ast, parameters: Params):
                     nodes[child].right_rate = nodes[child].pos / (len_children - 1.0)
                     nodes[child].left_rate = 1.0 - nodes[child].right_rate
 
-    dummy, dummy, avg_depth = compute_leaf_num(nodes[-1], nodes)
+    _, _, avg_depth = compute_leaf_num(nodes[-1], nodes)
     avg_depth *= .6
     if avg_depth < 1:        avg_depth = 1
 
@@ -175,10 +175,15 @@ def construct_network(nodes, parameters: Params, pool_cutoff):
     layers.append(dis_layer)
     layers.append(out_layer)
 
+    def builder(layer):
+        if not layer.initialized:
+            for c in layer.back_connection:
+                if not c.initialized:
+                    builder(c.from_layer)
+                    c.build_functions()
+            layer.build_functions()
+
     for lay in layers:
-        lay.build_functions()
-    for lay in layers:
-        for con in lay.forward_connection:
-            con.build_functions()
+        builder(lay)
 
     return layers

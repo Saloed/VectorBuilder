@@ -1,6 +1,7 @@
 import _pickle as P
 
 import numpy as np
+import theano
 from numpy.random import RandomState
 from theano import shared
 
@@ -89,6 +90,10 @@ def init_prepared_params():
     biases = biases.reshape((-1, 1))
 
     # theano wrapper
+
+    weights = np.asarray(weights, dtype=theano.config.floatX)
+    biases = np.asarray(biases, dtype=theano.config.floatX)
+
     w_left = shared(weights[w_left_area], 'W_left')
     w_right = shared(weights[w_right_area], 'W_right')
 
@@ -123,7 +128,6 @@ def init_prepared_params():
         target = index * NUM_FEATURES
         area = range(target, target + NUM_FEATURES)
         embeddings[index] = shared(biases[area], 'emb_' + token)
-
 
     biases = shared(biases, 'B')
     weights = shared(weights, 'W')
