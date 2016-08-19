@@ -55,6 +55,7 @@ def construct_network(nodes, parameters: Params, pool_cutoff):
     for i, node in enumerate(nodes):
         if len(node.children) == 0:
             leaf_amount += 1
+        # print(node.token_type)
         layers[i] = Layer(parameters.embeddings[node.token_index], "embedding_" + str(i))
     not_leaf_amount = nodes_amount - leaf_amount
     layers.extend([Layer] * (2 * not_leaf_amount))

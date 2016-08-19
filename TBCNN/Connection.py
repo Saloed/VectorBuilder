@@ -27,7 +27,7 @@ class Connection:
 
         if not self.is_pool:
             forward = T.mul(T.dot(self.weights, self.from_layer.forward()), self.w_coeff)
-            self.forward = function([], forward, updates=[
+            self.forward = function([], updates=[
                 (self.to_layer.z, self.to_layer.z + forward)
             ])
         else:  # means pool connection

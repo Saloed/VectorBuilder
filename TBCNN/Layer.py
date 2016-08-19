@@ -16,6 +16,13 @@ class Layer:
                  is_pool=False):
         self.bias = bias
 
+        # print("\n\n" + name + "\n")
+        # if bias is not None:
+        #     print(self.bias)
+        #     print(self.bias.eval())
+        # else:
+        #     print("bias is none")
+
         self.name = name
         self.is_pool = is_pool
 
