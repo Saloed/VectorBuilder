@@ -1,7 +1,7 @@
 import theano.tensor as T
 from theano import function
 from theano.compile.function import In
-from theano.compile.function import Out
+from theano.compile.io import Out
 from TBCNN.NetworkParams import *
 import theano.printing as tp
 

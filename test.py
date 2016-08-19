@@ -47,10 +47,28 @@ print("##################")
 # f=function([],s)
 # f()
 
+# y = shared(np.array([[0, 1], [2, 3]], dtype='float32'), name='y')
+# y.reshape((2, 2))
+#
+# t = TList.TypedListType(T.fmatrix)()
+# t.append(y)
+#
+# print(t.eval())
+
 y = shared(np.array([[0, 1], [2, 3]], dtype='float32'), name='y')
-y.reshape((2, 2))
+z = shared(np.array([[0, 1], [2, 3]], dtype='float32'), name='y')
+d = shared(np.array([[0, 1], [2, 3]], dtype='float32'), name='y')
+e = shared(np.array([[0, 1], [2, 3]], dtype='float32'), name='y')
 
-t = TList.TypedListType(T.fmatrix)()
-t.append(y)
+f_y = T.fvector('y')
 
-print(t.eval())
+fy = T.mul(T.dot(y, f_y), 2)
+fz = T.mul(T.dot(z, f_y), 10)
+
+l = [fy, fz]
+
+f1 = function([f_y], l)
+f = function([f_y], T.sum(l, axis=0))
+print(f([1, 2]))
+
+print(f1([1, 2]))
