@@ -38,7 +38,7 @@ class Layer:
                 print("None", file=file)
             if not is_pool:
                 print("input", file=file)
-                print(self.z, file=file)
+                print(self.z.eval(), file=file)
 
             print("\n", file=file)
             print(x, file=file)
@@ -62,11 +62,11 @@ class Layer:
                 if len(self.back_connection) == 0:
                     self.forward = function([], self.bias)
                 else:
-                    z = T.add(T.sum(connections, axis=0), self.bias)
-                    self.forward = function([], self.activation(z))
+                    self.z = T.sum(connections, axis=0)
+                    self.forward = function([], self.activation(T.add(self.z, self.bias)))
             else:
-                z = T.sum(connections, axis=0)
-                self.forward = function([], self.activation(z))
+                self.z = T.sum(connections, axis=0)
+                self.forward = function([], self.activation(self.z))
         else:
             z = connections
             self.forward = lambda: np.max(z, axis=0)
