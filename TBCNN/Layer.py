@@ -53,29 +53,23 @@ class Layer:
     def f_prop(self):
         self.forward()
 
-    def z_fun(self):
-        if not self.is_pool:
-            self.z = T.zeros((self.feature_amount, BATCH_SIZE))
-            for c in self.back_connection:
-                self.z += c.forward()
-        else:
-            self.z = []
-            for c in self.back_connection:
-                self.z.append(c.forward())
-
-        return self.z
-
     def build_functions(self):
+        connections = []
+        for c in self.back_connection:
+            connections.append(c.forward)
         if not self.is_pool:
             if self.bias is not None:
                 if len(self.back_connection) == 0:
                     self.forward = function([], self.bias)
                 else:
-                    self.forward = function([], self.activation(self.z_fun() + self.bias))
+                    z = T.add(T.sum(connections, axis=0), self.bias)
+                    self.forward = function([], self.activation(z))
             else:
-                self.forward = function([], self.activation(self.z_fun()))
+                z = T.sum(connections, axis=0)
+                self.forward = function([], self.activation(z))
         else:
-            self.forward = lambda: np.max(self.z_fun(), axis=0)
+            z = connections
+            self.forward = lambda: np.max(z, axis=0)
 
         self.initialized = True
 

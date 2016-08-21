@@ -10,7 +10,7 @@ theano.config.optimizer = 'None'
 theano.config.mode = 'DebugMode'
 theano.config.floatX = 'float32'
 
-ast = parse_file('test.cpp', use_cpp=True)
+ast = parse_file("test.cpp", use_cpp=True)
 
 # ast.show()
 params = init_prepared_params()

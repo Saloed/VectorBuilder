@@ -29,20 +29,9 @@ class Connection:
         # propagations
 
         if not self.is_pool:
-            c = T.fscalar('c')
-            y_f = T.fmatrix('y')
-
-            forward = T.mul(T.dot(self.weights, y_f), c)
-            self.forward = function(inputs=[
-                In(c, value=self.w_coeff),
-                In(y_f, value=self.from_layer.forward())
-            ], outputs=forward,
-                name="conn_" + self.from_layer.name + "_to_" + self.to_layer.name)
-
-            # tp.debugprint(self.forward)
-
+            self.forward = T.mul(T.dot(self.weights, self.from_layer.forward()), self.w_coeff)
         else:  # means pool connection
-            self.forward = function([], outputs=Out(self.from_layer.forward(), borrow=True))
+            self.forward = self.from_layer.forward()
         self.initialized = True
 
 
