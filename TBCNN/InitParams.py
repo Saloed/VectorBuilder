@@ -1,5 +1,6 @@
 import numpy as np
 import theano
+import _pickle as P
 from numpy.random import RandomState
 from theano import shared
 
@@ -39,8 +40,8 @@ def init_prepared_params():
     pre_biases, pre_b_construct_area = init_params(pre_biases, amount=NUM_FEATURES)
 
     # load prepared params
-    # pre_params = P.load(open('TBCNN/preparam', 'rb'), encoding='latin1')
-    pre_params = np.zeros(len(pre_weights) + len(pre_biases))
+    pre_params = P.load(open('TBCNN/preparam', 'rb'), encoding='latin1')
+    # pre_params = np.zeros(len(pre_weights) + len(pre_biases))
 
     pre_w = pre_params[:len(pre_weights)]
     pre_b = pre_params[len(pre_weights):]
