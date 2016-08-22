@@ -17,9 +17,8 @@ class Connection:
         from_layer.forward_connection.append(self)
         to_layer.back_connection.append(self)
 
-    def build_functions(self):
+    def build_forward(self):
         # propagations
-
         if not self.is_pool:
             self.forward = T.mul(T.dot(self.weights, self.from_layer.forward()), self.w_coeff)
         else:  # means pool connection

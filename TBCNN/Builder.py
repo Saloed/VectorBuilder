@@ -180,8 +180,8 @@ def construct_network(nodes, parameters: Params, pool_cutoff):
             for c in layer.back_connection:
                 if not c.initialized:
                     builder(c.from_layer)
-                    c.build_functions()
-            layer.build_functions()
+                    c.build_forward()
+            layer.build_forward()
 
     for lay in layers:
         builder(lay)

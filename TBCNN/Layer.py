@@ -23,7 +23,7 @@ class Layer:
 
         self.initialized = False
 
-    def build_functions(self):
+    def build_forward(self):
         connections = []
         for c in self.back_connection:
             connections.append(c.forward)
