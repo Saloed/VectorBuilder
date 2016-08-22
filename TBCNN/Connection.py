@@ -1,9 +1,4 @@
 import theano.tensor as T
-from theano import function
-from theano.compile.function import In
-from theano.compile.io import Out
-from TBCNN.NetworkParams import *
-import theano.printing as tp
 
 from TBCNN.Layer import Layer
 
@@ -21,9 +16,6 @@ class Connection:
 
         from_layer.forward_connection.append(self)
         to_layer.back_connection.append(self)
-
-    def f_prop(self):
-        self.forward()
 
     def build_functions(self):
         # propagations

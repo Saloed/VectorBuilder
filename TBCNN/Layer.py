@@ -1,14 +1,8 @@
 import numpy as np
-import theano
-import theano.printing as tp
 import theano.tensor as T
 from theano import function
-from theano import shared
 
-from TBCNN.NetworkParams import NUM_FEATURES, BATCH_SIZE
-
-file = open('layer_activ.txt', mode='w')
-fun_graph = open('function.png', mode='w')
+from TBCNN.NetworkParams import NUM_FEATURES
 
 
 class Layer:
@@ -29,30 +23,6 @@ class Layer:
 
         self.initialized = False
 
-        def test_activ(x):
-            print("\n\n", name, file=file)
-            print("bias", file=file)
-            if self.bias is not None:
-                print(self.bias.eval(), file=file)
-            else:
-                print("None", file=file)
-            if not is_pool:
-                print("input", file=file)
-                print(self.z.eval(), file=file)
-
-            print("\n", file=file)
-            print(x, file=file)
-            r = T.nnet.relu(x)
-            print("\n", file=file)
-            print(r, file=file)
-            return r
-
-        if self.name != "softmax":
-            self.activation = test_activ
-
-    def f_prop(self):
-        self.forward()
-
     def build_functions(self):
         connections = []
         for c in self.back_connection:
@@ -69,7 +39,8 @@ class Layer:
                 self.forward = function([], self.activation(self.z))
         else:
             z = connections
-            self.forward = lambda: np.max(z, axis=0)
+            # self.forward = lambda: np.max(z, axis=0)
+            self.forward = function([], T.max(z, axis=0))
 
         self.initialized = True
 
