@@ -23,7 +23,8 @@ class Layer:
 
         self.activation = activation
 
-        self.initialized = False
+        self.f_initialized = False
+        self.b_initialized = False
 
     def build_forward(self):
         connections = []
@@ -45,20 +46,35 @@ class Layer:
 
         # self.forward = function([], outputs=self.y)
         self.forward = self.y
-        self.initialized = True
+        self.f_initialized = True
 
     def build_back(self):
         if not self.is_pool:
             connections = []
             for c in self.out_connection:
-                connections.append(c.back)
+                connections.append(c.back())
             if len(connections) == 0:
                 self.dEdY = self.forward
                 self.dEdZ = self.forward
+                self.back = function([], outputs=self.dEdZ)
             else:
+                self.dEdY = T.sum(connections, axis=0)
+
+                # fixme
+                # this solution not works
+
+                self.dEdZ = self.dEdY * self.forward
                 if self.bias is None:
-                    self.dEdZ = None
-        pass
+                    pass
+                if len(self.in_connection) != 0:
+                    self.dEdB = T.sum(self.dEdZ, axis=1)
+                else:
+                    self.dEdB = self.dEdY
+                bias_upd = [(self.bias, self.bias + self.dEdB)]
+
+                self.back = function([], outputs=self.dEdZ, updates=bias_upd)
+
+        self.b_initialized = True
 
 
 def cost_function():

@@ -176,14 +176,25 @@ def construct_network(nodes, parameters: Params, pool_cutoff):
     layers.append(out_layer)
 
     def f_builder(layer):
-        if not layer.initialized:
+        if not layer.f_initialized:
             for c in layer.in_connection:
-                if not c.initialized:
+                if not c.f_initialized:
                     f_builder(c.from_layer)
                     c.build_forward()
             layer.build_forward()
 
+    def b_builder(layer):
+        if not layer.b_initialized:
+            for c in layer.out_connection:
+                if not c.b_initialized:
+                    b_builder(c.to_layer)
+                    c.build_back()
+            layer.build_back()
+
     for lay in layers:
         f_builder(lay)
+
+    # for lay in reversed(layers):
+    #     b_builder(lay)
 
     return layers
