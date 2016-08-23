@@ -1,3 +1,6 @@
+from  theano import function
+
+
 def forward_propagation(network: list):
     # last_layer = network[0]
     #
@@ -14,5 +17,5 @@ def forward_propagation(network: list):
     # f.close()
 
     last_layer = network[-1]
-
-    return last_layer.forward()
+    forward = function([], last_layer.forward)
+    return forward()

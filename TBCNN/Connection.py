@@ -20,9 +20,9 @@ class Connection:
     def build_forward(self):
         # propagations
         if not self.is_pool:
-            self.forward = T.mul(T.dot(self.weights, self.from_layer.forward()), self.w_coeff)
+            self.forward = T.mul(T.dot(self.weights, self.from_layer.forward), self.w_coeff)
         else:  # means pool connection
-            self.forward = self.from_layer.forward()
+            self.forward = self.from_layer.forward
         self.initialized = True
 
 

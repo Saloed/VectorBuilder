@@ -43,7 +43,8 @@ class Layer:
             z = connections
             self.y = T.max(z, axis=0)
 
-        self.forward = function([], outputs=self.y)
+        # self.forward = function([], outputs=self.y)
+        self.forward = self.y
         self.initialized = True
 
     def build_back(self):
