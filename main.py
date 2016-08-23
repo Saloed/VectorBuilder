@@ -1,4 +1,5 @@
 import theano
+import _pickle as P
 from pycparser import parse_file
 import theano.tensor as T
 from theano import function
@@ -14,10 +15,15 @@ theano.config.floatX = 'float32'
 ast = parse_file("test.cpp", use_cpp=True)
 
 # ast.show()
-params = init_prepared_params()
+
+# params = init_prepared_params()
+# P.dump(params,open('network_params','wb'))
+
+params = P.load(open('network_params', 'rb'))
+
 network = construct_from_ast(ast, params)
 result = forward_propagation(network)
-# print(result)
+print(result)
 
 x = T.fmatrix('x')
 y = T.fmatrix('y')

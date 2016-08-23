@@ -14,8 +14,8 @@ class Connection:
             self.weights = weights.reshape((to_layer.feature_amount, from_layer.feature_amount))
         self.w_coeff = w_coeff
 
-        from_layer.forward_connection.append(self)
-        to_layer.back_connection.append(self)
+        from_layer.out_connection.append(self)
+        to_layer.in_connection.append(self)
 
     def build_forward(self):
         # propagations
