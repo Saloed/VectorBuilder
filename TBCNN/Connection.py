@@ -26,11 +26,18 @@ class Connection:
         self.f_initialized = True
 
     def build_back(self):
-        dEdZ = self.to_layer.back()
-        dEdX = T.dot(self.weights.T, dEdZ) * self.w_coeff
-        dEdW = T.dot(dEdZ, self.from_layer.forward.T) * self.w_coeff
-        w_upd = [(self.weights, self.weights + dEdW)]
-        self.back = function([], outputs=dEdX, updates=w_upd)
+        if not self.is_pool:
+            print("con back ", self.to_layer.name)
+            dEdZ = self.to_layer.back()
+            # print("\tdedz | ",dEdZ)
+            dEdX = T.dot(self.weights.T, dEdZ) * self.w_coeff
+            print("\tdedx | ", dEdX)
+            dEdW = T.dot(dEdZ, self.from_layer.forward.T) * self.w_coeff
+            print("\tdedw | ", dEdW)
+            w_upd = [(self.weights, self.weights + dEdW)]
+            self.back = function([], outputs=dEdX, updates=w_upd)
+        else:
+            self.back = self.to_layer.back
         self.b_initialized = True
 
 

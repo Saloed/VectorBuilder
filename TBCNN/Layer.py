@@ -50,6 +50,7 @@ class Layer:
 
     def build_back(self):
         if not self.is_pool:
+            print(self.name)
             connections = []
             for c in self.out_connection:
                 connections.append(c.back())
@@ -59,20 +60,25 @@ class Layer:
                 self.back = function([], outputs=self.dEdZ)
             else:
                 self.dEdY = T.sum(connections, axis=0)
-
+                print("\tdedy | ", self.dEdY)
                 # fixme
                 # this solution not works
 
                 self.dEdZ = self.dEdY * self.forward
+                print("\tdedz", self.dEdZ)
                 if self.bias is None:
-                    pass
-                if len(self.in_connection) != 0:
-                    self.dEdB = T.sum(self.dEdZ, axis=1)
+                    self.back = function([], outputs=self.dEdZ)
                 else:
-                    self.dEdB = self.dEdY
-                bias_upd = [(self.bias, self.bias + self.dEdB)]
-
-                self.back = function([], outputs=self.dEdZ, updates=bias_upd)
+                    if len(self.in_connection) != 0:
+                        self.dEdB = T.sum(self.dEdZ, axis=1)
+                    else:
+                        self.dEdB = self.dEdY
+                    print("\tdedb | ", self.dEdB)
+                    bias_upd = [(self.bias, self.bias + self.dEdB.reshape((-1, 1)))]
+                    # print("\t new bias\n\t",(self.bias+self.dEdB.reshape((-1,1))).eval())
+                    self.back = function([], outputs=self.dEdZ, updates=bias_upd)
+        else:
+            self.back = self.out_connection[0].back
 
         self.b_initialized = True
 
