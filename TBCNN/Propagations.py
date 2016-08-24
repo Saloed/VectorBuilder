@@ -1,4 +1,5 @@
 from  theano import function
+from TBCNN.NetworkParams import Updates
 
 
 def forward_propagation(network: list):
@@ -19,3 +20,20 @@ def forward_propagation(network: list):
     last_layer = network[-1]
     forward = function([], last_layer.forward)
     return forward()
+
+
+def back_propagation(network: list, updates: Updates):
+    update = []
+
+    def make_update(target, upd):
+        tpl = (target, target + upd)
+        return tpl
+
+    for (bias, upd) in updates.bias_updates.items():
+        update.append(make_update(bias, upd))
+
+    for (weights, upd) in updates.weights_updates.items():
+        update.append(make_update(weights, upd))
+
+    b_prop = function([], updates=update)
+    b_prop()

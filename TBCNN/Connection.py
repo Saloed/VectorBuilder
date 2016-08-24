@@ -1,6 +1,7 @@
 import theano.tensor as T
 from theano import function
 from TBCNN.Layer import Layer
+from TBCNN.NetworkParams import Updates
 
 
 class Connection:
@@ -25,17 +26,23 @@ class Connection:
             self.forward = self.from_layer.forward
         self.f_initialized = True
 
-    def build_back(self):
+    def build_back(self, updates: Updates):
         if not self.is_pool:
-            print("con back ", self.to_layer.name)
-            dEdZ = self.to_layer.back()
+            # print("con back ", self.to_layer.name)
+            dEdZ = self.to_layer.back
             # print("\tdedz | ",dEdZ)
             dEdX = T.dot(self.weights.T, dEdZ) * self.w_coeff
-            print("\tdedx | ", dEdX)
+            # print("\tdedx | ", dEdX)
             dEdW = T.dot(dEdZ, self.from_layer.forward.T) * self.w_coeff
-            print("\tdedw | ", dEdW)
-            w_upd = [(self.weights, self.weights + dEdW)]
-            self.back = function([], outputs=dEdX, updates=w_upd)
+            # print("\tdedw | ", dEdW)
+
+            upd = updates.weights_updates.get(self.weights, None)
+            if upd is not None:
+                updates.weights_updates[self.weights] = upd + dEdW
+            else:
+                updates.weights_updates[self.weights] = dEdW
+
+            self.back = dEdX
         else:
             self.back = self.to_layer.back
         self.b_initialized = True

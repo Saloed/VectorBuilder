@@ -4,6 +4,7 @@ import theano
 from theano import function
 from theano import shared
 import theano.compile
+from TBCNN.NetworkParams import Updates
 from TBCNN.NetworkParams import NUM_FEATURES, BATCH_SIZE
 
 
@@ -48,43 +49,50 @@ class Layer:
         self.forward = self.y
         self.f_initialized = True
 
-    def build_back(self):
+    def build_back(self, updates: Updates):
         if not self.is_pool:
-            print(self.name)
+            # print(self.name)
             connections = []
             for c in self.out_connection:
-                connections.append(c.back())
+                connections.append(c.back)
             if len(connections) == 0:
                 self.dEdY = self.forward
                 self.dEdZ = self.forward
-                self.back = function([], outputs=self.dEdZ)
+                self.back = self.dEdZ
             else:
                 self.dEdY = T.sum(connections, axis=0)
-                print("\tdedy | ", self.dEdY)
+
+                # print("\tdedy | ", self.dEdY)
+
                 # fixme
                 # this solution not works
-
                 self.dEdZ = self.dEdY * self.forward
-                print("\tdedz", self.dEdZ)
+
+                # print("\tdedz", self.dEdZ)
+
                 if self.bias is None:
-                    self.back = function([], outputs=self.dEdZ)
+                    self.back = self.dEdZ
                 else:
                     if len(self.in_connection) != 0:
                         self.dEdB = T.sum(self.dEdZ, axis=1)
                     else:
                         self.dEdB = self.dEdY
-                    print("\tdedb | ", self.dEdB)
-                    bias_upd = [(self.bias, self.bias + self.dEdB.reshape((-1, 1)))]
-                    # print("\t new bias\n\t",(self.bias+self.dEdB.reshape((-1,1))).eval())
-                    self.back = function([], outputs=self.dEdZ, updates=bias_upd)
+
+                    # print("\tdedb | ", self.dEdB)
+
+                    self.bias_upd = self.dEdB.reshape((-1, 1))
+
+                    upd = updates.bias_updates.get(self.bias, None)
+                    if upd is not None:
+                        updates.bias_updates[self.bias] = upd + self.bias_upd
+                    else:
+                        updates.bias_updates[self.bias] = self.bias_upd
+
+                    self.back = self.dEdZ
         else:
             self.back = self.out_connection[0].back
 
         self.b_initialized = True
-
-
-def cost_function():
-    pass
 
 
 class PoolLayer(Layer):

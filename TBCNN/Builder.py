@@ -23,7 +23,7 @@ def compute_leaf_num(root, nodes, depth=0):
     return root.leaf_num, root.children_num, avg_depth
 
 
-def construct_from_ast(ast, parameters: Params):
+def construct_from_ast(ast, parameters: Params, updates: Updates = Updates()):
     nodes = ast_to_list(ast)
 
     for i in range(len(nodes)):
@@ -45,10 +45,10 @@ def construct_from_ast(ast, parameters: Params):
     avg_depth *= .6
     if avg_depth < 1:        avg_depth = 1
 
-    return construct_network(nodes, parameters, avg_depth)
+    return construct_network(nodes, parameters, updates, avg_depth)
 
 
-def construct_network(nodes, parameters: Params, pool_cutoff):
+def construct_network(nodes, parameters: Params, updates: Updates, pool_cutoff):
     nodes_amount = len(nodes)
     layers = [Layer] * nodes_amount
     leaf_amount = 0
@@ -188,13 +188,13 @@ def construct_network(nodes, parameters: Params, pool_cutoff):
             for c in layer.out_connection:
                 if not c.b_initialized:
                     b_builder(c.to_layer)
-                    c.build_back()
-            layer.build_back()
+                    c.build_back(updates)
+            layer.build_back(updates)
 
     for lay in layers:
         f_builder(lay)
 
-    # for lay in reversed(layers):
-    #     b_builder(lay)
+    for lay in reversed(layers):
+        b_builder(lay)
 
     return layers

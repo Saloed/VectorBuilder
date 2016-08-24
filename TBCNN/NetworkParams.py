@@ -16,6 +16,12 @@ DONT_MAKE_CONV = False
 BATCH_SIZE = 1
 
 
+class Updates:
+    def __init__(self):
+        self.bias_updates = dict()
+        self.weights_updates = dict()
+
+
 class Params:
     def __init__(self, weights, biases,
                  w_left, w_right,

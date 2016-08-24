@@ -4,8 +4,8 @@ from pycparser import parse_file
 import theano.tensor as T
 from theano import function
 from TBCNN.Builder import construct_from_ast
-from TBCNN.InitParams import init_prepared_params
-from TBCNN.Propagations import forward_propagation
+from TBCNN.NetworkParams import Updates
+from TBCNN.Propagations import forward_propagation, back_propagation
 
 theano.config.exception_verbosity = 'high'
 theano.config.optimizer = 'None'
@@ -20,10 +20,15 @@ ast = parse_file("test.cpp", use_cpp=True)
 # P.dump(params,open('network_params','wb'))
 
 params = P.load(open('network_params', 'rb'))
+updates = Updates()
 
-network = construct_from_ast(ast, params)
+network = construct_from_ast(ast, params, updates)
+
 result = forward_propagation(network)
 print(result)
+
+back_propagation(network, updates)
+print("back propagation done")
 
 x = T.fmatrix('x')
 y = T.fmatrix('y')
