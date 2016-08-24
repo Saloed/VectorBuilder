@@ -27,6 +27,7 @@ network = construct_from_ast(ast, params, updates)
 result = forward_propagation(network)
 print(result)
 
+print("back propagation start")
 back_propagation(network, updates)
 print("back propagation done")
 

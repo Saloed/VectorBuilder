@@ -13,17 +13,12 @@ class Layer:
                  activation=T.nnet.relu,
                  is_pool=False):
         self.bias = bias
-
         self.name = name
         self.is_pool = is_pool
-
         self.feature_amount = feature_amount
-
         self.out_connection = []
         self.in_connection = []
-
         self.activation = activation
-
         self.f_initialized = False
         self.b_initialized = False
 
@@ -44,8 +39,6 @@ class Layer:
         else:
             z = connections
             self.y = T.max(z, axis=0)
-
-        # self.forward = function([], outputs=self.y)
         self.forward = self.y
         self.f_initialized = True
 
@@ -61,15 +54,9 @@ class Layer:
                 self.back = self.dEdZ
             else:
                 self.dEdY = T.sum(connections, axis=0)
-
-                # print("\tdedy | ", self.dEdY)
-
                 # fixme
                 # this solution not works
-                self.dEdZ = self.dEdY * self.forward
-
-                # print("\tdedz", self.dEdZ)
-
+                self.dEdZ = self.dEdY * np.array(self.forward != 0, dtype=theano.config.floatX)
                 if self.bias is None:
                     self.back = self.dEdZ
                 else:
@@ -77,21 +64,15 @@ class Layer:
                         self.dEdB = T.sum(self.dEdZ, axis=1)
                     else:
                         self.dEdB = self.dEdY
-
-                    # print("\tdedb | ", self.dEdB)
-
                     self.bias_upd = self.dEdB.reshape((-1, 1))
-
                     upd = updates.bias_updates.get(self.bias, None)
                     if upd is not None:
                         updates.bias_updates[self.bias] = upd + self.bias_upd
                     else:
                         updates.bias_updates[self.bias] = self.bias_upd
-
                     self.back = self.dEdZ
         else:
             self.back = self.out_connection[0].back
-
         self.b_initialized = True
 
 

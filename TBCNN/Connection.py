@@ -19,29 +19,22 @@ class Connection:
         to_layer.in_connection.append(self)
 
     def build_forward(self):
-        # propagations
         if not self.is_pool:
             self.forward = T.mul(T.dot(self.weights, self.from_layer.forward), self.w_coeff)
-        else:  # means pool connection
+        else:
             self.forward = self.from_layer.forward
         self.f_initialized = True
 
     def build_back(self, updates: Updates):
         if not self.is_pool:
-            # print("con back ", self.to_layer.name)
             dEdZ = self.to_layer.back
-            # print("\tdedz | ",dEdZ)
             dEdX = T.dot(self.weights.T, dEdZ) * self.w_coeff
-            # print("\tdedx | ", dEdX)
             dEdW = T.dot(dEdZ, self.from_layer.forward.T) * self.w_coeff
-            # print("\tdedw | ", dEdW)
-
             upd = updates.weights_updates.get(self.weights, None)
             if upd is not None:
                 updates.weights_updates[self.weights] = upd + dEdW
             else:
                 updates.weights_updates[self.weights] = dEdW
-
             self.back = dEdX
         else:
             self.back = self.to_layer.back

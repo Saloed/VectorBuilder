@@ -24,8 +24,10 @@ def forward_propagation(network: list):
 
 def back_propagation(network: list, updates: Updates):
     update = []
+    diff = []
 
     def make_update(target, upd):
+        diff.append(upd)
         tpl = (target, target + upd)
         return tpl
 
@@ -37,3 +39,6 @@ def back_propagation(network: list, updates: Updates):
 
     b_prop = function([], updates=update)
     b_prop()
+
+    # test_b_prop = function([], outputs=diff)
+    # print(test_b_prop())
