@@ -7,9 +7,9 @@ from TBCNN.Builder import construct_from_ast
 from TBCNN.NetworkParams import Updates
 from TBCNN.Propagations import forward_propagation, back_propagation
 
-theano.config.exception_verbosity = 'high'
-theano.config.optimizer = 'None'
-theano.config.mode = 'DebugMode'
+# theano.config.exception_verbosity = 'high'
+theano.config.optimizer = 'fast_compile'
+# theano.config.mode = 'DebugMode'
 theano.config.floatX = 'float32'
 
 ast = parse_file("test.cpp", use_cpp=True)

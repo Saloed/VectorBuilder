@@ -2,11 +2,12 @@ import theano.tensor as T
 from theano import function
 from TBCNN.Layer import Layer
 from TBCNN.NetworkParams import Updates
+from theano.compile import SharedVariable as TS
 
 
 class Connection:
     def __init__(self, from_layer: Layer, to_layer: Layer,
-                 weights, w_coeff=1.0, is_pool=False):
+                 weights: TS, w_coeff=1.0, is_pool=False):
         self.from_layer = from_layer
         self.to_layer = to_layer
         self.is_pool = is_pool

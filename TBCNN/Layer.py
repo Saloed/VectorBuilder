@@ -6,10 +6,11 @@ from theano import shared
 import theano.compile
 from TBCNN.NetworkParams import Updates
 from TBCNN.NetworkParams import NUM_FEATURES, BATCH_SIZE
+from theano.compile import SharedVariable as TS
 
 
 class Layer:
-    def __init__(self, bias, name="", feature_amount=NUM_FEATURES,
+    def __init__(self, bias: TS, name="", feature_amount=NUM_FEATURES,
                  activation=T.nnet.relu,
                  is_pool=False):
         self.bias = bias
@@ -23,9 +24,7 @@ class Layer:
         self.b_initialized = False
 
     def build_forward(self):
-        connections = []
-        for c in self.in_connection:
-            connections.append(c.forward)
+        connections = [c.forward for c in self.in_connection]
         if not self.is_pool:
             if self.bias is not None:
                 if len(self.in_connection) == 0:
@@ -37,40 +36,35 @@ class Layer:
                 self.z = T.sum(connections, axis=0)
                 self.y = self.activation(self.z)
         else:
-            z = connections
-            self.y = T.max(z, axis=0)
+            self.y = T.max(connections, axis=0)
         self.forward = self.y
         self.f_initialized = True
 
     def build_back(self, updates: Updates):
         if not self.is_pool:
-            # print(self.name)
-            connections = []
-            for c in self.out_connection:
-                connections.append(c.back)
+            connections = [c.back for c in self.out_connection]
             if len(connections) == 0:
-                self.dEdY = self.forward
-                self.dEdZ = self.forward
-                self.back = self.dEdZ
+                dEdY = self.forward
+                dEdZ = self.forward
+                self.back = dEdZ
             else:
-                self.dEdY = T.sum(connections, axis=0)
-                # fixme
-                # this solution not works
-                self.dEdZ = self.dEdY * np.array(self.forward != 0, dtype=theano.config.floatX)
+                dEdY = T.sum(connections, axis=0)
+                dEdZ = dEdY * np.array(self.forward != 0,
+                                       dtype=theano.config.floatX)
                 if self.bias is None:
-                    self.back = self.dEdZ
+                    self.back = dEdZ
                 else:
-                    if len(self.in_connection) != 0:
-                        self.dEdB = T.sum(self.dEdZ, axis=1)
+                    if len(self.in_connection) == 0:
+                        dEdB = dEdY
                     else:
-                        self.dEdB = self.dEdY
-                    self.bias_upd = self.dEdB.reshape((-1, 1))
+                        dEdB = T.sum(dEdZ, axis=1)
+                    bias_upd = dEdB.reshape((-1, 1))
                     upd = updates.bias_updates.get(self.bias, None)
                     if upd is not None:
-                        updates.bias_updates[self.bias] = upd + self.bias_upd
+                        updates.bias_updates[self.bias] = upd + bias_upd
                     else:
-                        updates.bias_updates[self.bias] = self.bias_upd
-                    self.back = self.dEdZ
+                        updates.bias_updates[self.bias] = bias_upd
+                    self.back = dEdZ
         else:
             self.back = self.out_connection[0].back
         self.b_initialized = True
