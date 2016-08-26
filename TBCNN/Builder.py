@@ -1,4 +1,5 @@
 import theano.tensor as T
+from theano import function
 
 from AST.Tokenizer import ast_to_list
 from TBCNN.Connection import Connection, PoolConnection
@@ -23,7 +24,7 @@ def compute_leaf_num(root, nodes, depth=0):
     return root.leaf_num, root.children_num, avg_depth
 
 
-def construct_from_ast(ast, parameters: Params, updates: Updates = None):
+def construct_from_ast(ast, parameters: Params, need_back_prop=False):
     nodes = ast_to_list(ast)
 
     for i in range(len(nodes)):
@@ -45,10 +46,10 @@ def construct_from_ast(ast, parameters: Params, updates: Updates = None):
     avg_depth *= .6
     if avg_depth < 1:        avg_depth = 1
 
-    return construct_network(nodes, parameters, updates, avg_depth)
+    return construct_network(nodes, parameters, need_back_prop, avg_depth)
 
 
-def construct_network(nodes, parameters: Params, updates: Updates, pool_cutoff):
+def construct_network(nodes, parameters: Params, need_back_prop: bool, pool_cutoff):
     nodes_amount = len(nodes)
     layers = [Layer] * nodes_amount
     leaf_amount = 0
@@ -183,19 +184,47 @@ def construct_network(nodes, parameters: Params, updates: Updates, pool_cutoff):
                     c.build_forward()
             layer.build_forward()
 
-    def b_builder(layer):
+    def b_builder(layer, update: Updates):
         if not layer.b_initialized:
             for c in layer.out_connection:
                 if not c.b_initialized:
-                    b_builder(c.to_layer)
-                    c.build_back(updates)
-            layer.build_back(updates)
+                    b_builder(c.to_layer, update)
+                    c.build_back(update)
+            layer.build_back(update)
+
+    def forward_propagation(network: list):
+        last_layer = network[-1]
+        forward = function([], last_layer.forward)
+        return forward
+
+    def back_propagation(updates: Updates):
+        update = []
+        diff = []
+
+        def make_update(target, upd):
+            diff.append(upd)
+            tpl = (target, target + upd)
+            return tpl
+
+        for (bias, upd) in updates.bias_updates.items():
+            update.append(make_update(bias, upd))
+
+        for (weights, upd) in updates.weights_updates.items():
+            update.append(make_update(weights, upd))
+
+        b_prop = function([], updates=update)
+        return b_prop
+
+    network = Network(layers)
 
     for lay in layers:
         f_builder(lay)
+    network.forward = forward_propagation(layers)
 
-    if updates is not None:
+    if need_back_prop:
+        update = Updates()
         for lay in reversed(layers):
-            b_builder(lay)
+            b_builder(lay, update)
+        network.back = back_propagation(update)
 
-    return layers
+    return network

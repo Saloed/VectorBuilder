@@ -4,8 +4,7 @@ from pycparser import parse_file
 import theano.tensor as T
 from theano import function
 from TBCNN.Builder import construct_from_ast
-from TBCNN.NetworkParams import Updates
-from TBCNN.Propagations import forward_propagation, back_propagation
+
 
 # theano.config.exception_verbosity = 'high'
 theano.config.optimizer = 'fast_compile'
@@ -20,15 +19,14 @@ ast = parse_file("test.cpp", use_cpp=True)
 # P.dump(params,open('network_params','wb'))
 
 params = P.load(open('network_params', 'rb'))
-updates = Updates()
 
-network = construct_from_ast(ast, params, updates)
+network = construct_from_ast(ast, params, need_back_prop=True)
 
-result = forward_propagation(network)
+result = network.forward()
 print(result)
 
 print("back propagation start")
-back_propagation(network, updates)
+network.back()
 print("back propagation done")
 
 x = T.fmatrix('x')
@@ -42,11 +40,13 @@ results = []
 
 
 # can't run others because of parser
+
+
 def evaluate_file(filename):
     print("Building vector for " + filename)
     ast = parse_file(filename, use_cpp=True)
     network = construct_from_ast(ast, params)
-    return forward_propagation(network)
+    return network.forward()
 
 
 for i in range(4):

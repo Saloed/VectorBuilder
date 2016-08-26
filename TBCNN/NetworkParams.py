@@ -22,6 +22,13 @@ class Updates:
         self.weights_updates = dict()
 
 
+class Network:
+    def __init__(self, layers):
+        self.layers = layers
+        self.forward = None
+        self.back = None
+
+
 class Params:
     def __init__(self, weights, biases,
                  w_left, w_right,
