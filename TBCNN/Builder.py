@@ -212,7 +212,7 @@ def construct_network(nodes, parameters: Params, need_back_prop: bool, pool_cuto
         for (weights, upd) in updates.weights_updates.items():
             update.append(make_update(weights, upd))
 
-        b_prop = function([], updates=update)
+        b_prop = function([updates.error], updates=update)
         return b_prop
 
     network = Network(layers)

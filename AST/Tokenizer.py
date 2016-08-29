@@ -21,7 +21,7 @@ import sys, inspect
 def ast_to_list(ast) -> list:
     nodes = []
     leafs = []
-    tokenize(ast, None, None, nodes, leafs)
+    tokenize(ast, None, None, None, nodes, leafs)
     nodes.extend(leafs)
     reorder(nodes)
     return nodes
@@ -48,31 +48,33 @@ def build_ast(filename) -> list:
     for line in lines:
         code += line
     ast = parse.parse(code)
-    print_ast(ast)
+    # print_ast(ast)
     # print(print_classes())
     return ast_to_list(ast)
 
 
-def tokenize(root, parent, pos, nodes, leafs):
+def tokenize(root, parent, parent_id, pos, nodes, leafs):
     if root is None:
         return
     if isinstance(root, Node):
         token_type = root.__repr__()
         token = Token(token_type, token_map[token_type],
-                      parent, pos)
+                      parent_id, pos)
+        if parent is not None:
+            parent.children.append(token)
         children = root.children
         if len(children) == 0:
             leafs.append(token)
         else:
             nodes.append(token)
 
-        cur_id = len(nodes)
-        for idx, child in enumerate(children):
-            tokenize(child, cur_id, idx, nodes, leafs)
+            cur_id = len(nodes)
+            for idx, child in enumerate(children):
+                tokenize(child, token, cur_id, idx, nodes, leafs)
 
     elif isinstance(root, list):
         for el in root:
-            tokenize(el, parent, pos, nodes, leafs)
+            tokenize(el, parent, parent_id, pos, nodes, leafs)
     else:
         return
 

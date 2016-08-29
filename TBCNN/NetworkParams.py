@@ -1,3 +1,5 @@
+import theano.tensor
+
 NUM_FEATURES = 30
 
 margin = 1
@@ -20,6 +22,8 @@ class Updates:
     def __init__(self):
         self.bias_updates = dict()
         self.weights_updates = dict()
+
+        self.error = theano.tensor.fvector('E')
 
 
 class Network:

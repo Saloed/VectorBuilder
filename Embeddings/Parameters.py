@@ -1,6 +1,8 @@
 from theano.compile import SharedVariable as SV
 
 NUM_FEATURE = 30
+MARGIN = 1
+LEARN_RATE = 0.003
 
 
 class Parameters:

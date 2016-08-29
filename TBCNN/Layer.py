@@ -44,8 +44,8 @@ class Layer:
         if not self.is_pool:
             connections = [c.back for c in self.out_connection]
             if len(connections) == 0:
-                dEdY = self.forward
-                dEdZ = self.forward
+                dEdY = updates.error
+                dEdZ = updates.error
                 self.back = dEdZ
             else:
                 dEdY = T.sum(connections, axis=0)

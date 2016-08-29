@@ -1,48 +1,49 @@
 from theano import function
 
-from Embeddings.Parameters import Parameters, NUM_FEATURE
+from Embeddings.Parameters import Parameters, NUM_FEATURE, LEARN_RATE
 from AST.TokenMap import token_map
 import numpy as np
 
 from TBCNN.Connection import Connection
 from TBCNN.Layer import Layer
 from TBCNN.NetworkParams import Network, Updates
+from TBCNN.Builder import compute_leaf_num
 
 
 def construct(tokens, params: Parameters):
-    # todo add fill of array
-    leaf_cnt = np.array([])
+    for i in range(len(tokens)):
+        node = tokens[i]
+        len_children = len(node.children)
+        if len_children >= 0:
+            for child in node.children:
+                if len_children == 1:
+                    tokens[child].left_rate = .5
+                    tokens[child].right_rate = .5
+                else:
+                    tokens[child].right_rate = tokens[child].pos / (len_children - 1.0)
+                    tokens[child].left_rate = 1.0 - tokens[child].right_rate
 
-    layers = []
+    compute_leaf_num(tokens[-1], tokens)
 
-    root_token = tokens[0]
-    root_idx = token_map[root_token]
-    root = Layer(bias=params.embeddings[root_idx], name=root_token, feature_amount=NUM_FEATURE)
+    nodes_amount = len(tokens)
+    layers = [Layer] * nodes_amount
+    leaf_amount = 0
+    for i, node in enumerate(tokens):
+        if len(node.children) == 0:
+            leaf_amount += 1
+        layers[i] = Layer(params.embeddings[node.token_index], "embedding_" + str(i))
 
-    child_amount = len(tokens)
-    for i in range(1, child_amount):
-        child_token = tokens[i]
-        child_idx = token_map[child_token]
-
-        child = Layer(bias=params.embeddings[child_idx], name=child_token, feature_amount=NUM_FEATURE)
-
-        if child_amount == 2:
-            left_coeff = 0.5
-            right_coeff = 0.5
-        else:
-            right_coeff = (i - 1) / (child_amount - 2)
-            left_coeff = 1 - right_coeff
-
-        left_coeff *= leaf_cnt[i - 1]
-        right_coeff *= leaf_cnt[i - 1]
-
-        if left_coeff != 0:
-            Connection(child, root, params.w_left, left_coeff)
-        if right_coeff != 0:
-            Connection(child, root, params.w_right, right_coeff)
-
-        layers.append(child)
-    layers.append(root)
+    for i in range(nodes_amount):
+        node = tokens[i]
+        if node.parent is None: continue
+        from_layer = layers[i]
+        to_layer = layers[node.parent]
+        if node.left_rate != 0:
+            Connection(from_layer, to_layer, params.w_left,
+                       w_coeff=node.left_rate * node.leaf_num / tokens[node.parent].leaf_num)
+        if node.right_rate != 0:
+            Connection(from_layer, to_layer, params.w_right,
+                       w_coeff=node.right_rate * node.leaf_num / tokens[node.parent].leaf_num)
 
     def f_builder(layer):
         if not layer.f_initialized:
@@ -71,7 +72,7 @@ def construct(tokens, params: Parameters):
 
         def make_update(target, upd):
             diff.append(upd)
-            tpl = (target, target + upd)
+            tpl = (target, target + LEARN_RATE * upd)
             return tpl
 
         for (bias, upd) in updates.bias_updates.items():
