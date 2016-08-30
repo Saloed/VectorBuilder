@@ -59,11 +59,11 @@ class Layer:
                     else:
                         dEdB = T.sum(dEdZ, axis=1)
                     bias_upd = dEdB.reshape((-1, 1))
-                    upd = updates.bias_updates.get(self.bias, None)
+                    upd = updates.bias_updates.get(self.bias.name, None)
                     if upd is not None:
-                        updates.bias_updates[self.bias] = upd + bias_upd
+                        updates.bias_updates[self.bias.name] = upd + bias_upd
                     else:
-                        updates.bias_updates[self.bias] = bias_upd
+                        updates.bias_updates[self.bias.name] = bias_upd
                     self.back = dEdZ
         else:
             self.back = self.out_connection[0].back

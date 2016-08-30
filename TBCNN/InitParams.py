@@ -94,29 +94,29 @@ def init_prepared_params():
     weights = np.asarray(weights, dtype=theano.config.floatX)
     biases = np.asarray(biases, dtype=theano.config.floatX)
 
-    w_left = shared(weights[w_left_area].reshape((NUM_FEATURES, NUM_FEATURES)), 'W_left')
-    w_right = shared(weights[w_right_area].reshape((NUM_FEATURES, NUM_FEATURES)), 'W_right')
+    w_left = shared(weights[w_left_area].reshape((NUM_FEATURES, NUM_FEATURES)), 'w_left')
+    w_right = shared(weights[w_right_area].reshape((NUM_FEATURES, NUM_FEATURES)), 'w_right')
 
-    w_comb_ae = shared(weights[w_comb_ae_area].reshape((NUM_FEATURES, NUM_FEATURES)), 'W_comb_ae')
-    w_comb_emb = shared(weights[w_comb_emb_area].reshape((NUM_FEATURES, NUM_FEATURES)), 'W_comb_emb')
+    w_comb_ae = shared(weights[w_comb_ae_area].reshape((NUM_FEATURES, NUM_FEATURES)), 'w_comb_ae')
+    w_comb_emb = shared(weights[w_comb_emb_area].reshape((NUM_FEATURES, NUM_FEATURES)), 'w_comb_emb')
 
-    w_conv_root = shared(weights[w_conv_root_area].reshape((NUM_CONVOLUTION, NUM_FEATURES)), 'W_conv_root')
-    w_conv_left = shared(weights[w_conv_left_area].reshape((NUM_CONVOLUTION, NUM_FEATURES)), 'W_conv_left')
-    w_conv_right = shared(weights[w_conv_right_area].reshape((NUM_CONVOLUTION, NUM_FEATURES)), 'W_conv_right')
+    w_conv_root = shared(weights[w_conv_root_area].reshape((NUM_CONVOLUTION, NUM_FEATURES)), 'w_conv_root')
+    w_conv_left = shared(weights[w_conv_left_area].reshape((NUM_CONVOLUTION, NUM_FEATURES)), 'w_conv_left')
+    w_conv_right = shared(weights[w_conv_right_area].reshape((NUM_CONVOLUTION, NUM_FEATURES)), 'w_conv_right')
 
     w_dis = weights[w_dis_area]
 
-    w_out = shared(weights[w_out_area].reshape((NUM_OUT_LAYER, NUM_DISCRIMINATIVE)), 'W_out')
+    w_out = shared(weights[w_out_area].reshape((NUM_OUT_LAYER, NUM_DISCRIMINATIVE)), 'w_out')
 
-    b_token = shared(biases[b_token_area], 'B_token')
+    b_token = shared(biases[b_token_area], 'b_token')
 
-    b_construct = shared(biases[b_construct_area], 'B_constr')
+    b_construct = shared(biases[b_construct_area], 'b_construct')
 
-    b_conv = shared(biases[b_conv_area], 'B_conv')
+    b_conv = shared(biases[b_conv_area], 'b_conv')
 
-    b_dis = shared(biases[b_dis_area], 'B_dis')
+    b_dis = shared(biases[b_dis_area], 'b_dis')
 
-    b_out = shared(biases[b_out_area], 'B_out')
+    b_out = shared(biases[b_out_area], 'b_out')
 
     ows = NUM_DISCRIMINATIVE * NUM_CONVOLUTION
     w_dis_top = shared(w_dis[0:ows].reshape((NUM_DISCRIMINATIVE, NUM_CONVOLUTION)), 'w_dis_top')
@@ -129,11 +129,7 @@ def init_prepared_params():
         area = range(target, target + NUM_FEATURES)
         embeddings[index] = shared(biases[area], 'emb_' + token)
 
-    biases = shared(biases, 'B')
-    weights = shared(weights, 'W')
-
-    return Params(weights, biases,
-                  w_left, w_right,
+    return Params(w_left, w_right,
                   w_comb_ae, w_comb_emb,
                   w_conv_root, w_conv_left, w_conv_right,
                   w_dis_top, w_dis_left, w_dis_right,

@@ -29,13 +29,13 @@ class Connection:
     def build_back(self, updates: Updates):
         if not self.is_pool:
             dEdZ = self.to_layer.back
-            dEdX = T.dot(self.weights.T, dEdZ) * self.w_coeff
-            dEdW = T.dot(dEdZ, self.from_layer.forward.T) * self.w_coeff
-            upd = updates.weights_updates.get(self.weights, None)
+            dEdX = T.mul(T.dot(self.weights.T, dEdZ), self.w_coeff)
+            dEdW = T.mul(T.dot(dEdZ, self.from_layer.forward.T), self.w_coeff)
+            upd = updates.weights_updates.get(self.weights.name, None)
             if upd is not None:
-                updates.weights_updates[self.weights] = upd + dEdW
+                updates.weights_updates[self.weights.name] = upd + dEdW
             else:
-                updates.weights_updates[self.weights] = dEdW
+                updates.weights_updates[self.weights.name] = dEdW
             self.back = dEdX
         else:
             self.back = self.to_layer.back

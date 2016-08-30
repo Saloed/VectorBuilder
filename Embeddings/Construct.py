@@ -1,6 +1,6 @@
 from theano import function
-
-from Embeddings.Parameters import Parameters, NUM_FEATURE, LEARN_RATE
+import theano.tensor as T
+from Embeddings.Parameters import Parameters, NUM_FEATURES, LEARN_RATE
 from AST.TokenMap import token_map
 import numpy as np
 
@@ -10,18 +10,18 @@ from TBCNN.NetworkParams import Network, Updates
 from TBCNN.Builder import compute_leaf_num
 
 
-def construct(tokens, params: Parameters):
+def construct(tokens, params: Parameters, update: Updates):
     for i in range(len(tokens)):
         node = tokens[i]
         len_children = len(node.children)
         if len_children >= 0:
             for child in node.children:
                 if len_children == 1:
-                    tokens[child].left_rate = .5
-                    tokens[child].right_rate = .5
+                    child.left_rate = .5
+                    child.right_rate = .5
                 else:
-                    tokens[child].right_rate = tokens[child].pos / (len_children - 1.0)
-                    tokens[child].left_rate = 1.0 - tokens[child].right_rate
+                    child.right_rate = child.pos / (len_children - 1.0)
+                    child.left_rate = 1.0 - child.right_rate
 
     compute_leaf_num(tokens[-1], tokens)
 
@@ -36,13 +36,16 @@ def construct(tokens, params: Parameters):
     for i in range(nodes_amount):
         node = tokens[i]
         if node.parent is None: continue
+        if node.parent >= nodes_amount: continue
+
         from_layer = layers[i]
         to_layer = layers[node.parent]
+
         if node.left_rate != 0:
-            Connection(from_layer, to_layer, params.w_left,
+            Connection(from_layer, to_layer, params.w['w_left'],
                        w_coeff=node.left_rate * node.leaf_num / tokens[node.parent].leaf_num)
         if node.right_rate != 0:
-            Connection(from_layer, to_layer, params.w_right,
+            Connection(from_layer, to_layer, params.w['w_right'],
                        w_coeff=node.right_rate * node.leaf_num / tokens[node.parent].leaf_num)
 
     def f_builder(layer):
@@ -63,26 +66,26 @@ def construct(tokens, params: Parameters):
 
     def forward_propagation(network: list):
         last_layer = network[-1]
-        forward = function([], last_layer.forward)
-        return forward
+        return function([], last_layer.forward)
 
     def back_propagation(updates: Updates):
-        update = []
-        diff = []
+        update_w = []
+        update_b = []
 
         def make_update(target, upd):
-            diff.append(upd)
-            tpl = (target, target + LEARN_RATE * upd)
+            print(target)
+            print(upd.type)
+            tpl = (target, target + T.mul(upd, LEARN_RATE))
             return tpl
 
         for (bias, upd) in updates.bias_updates.items():
-            update.append(make_update(bias, upd))
+            update_b.append(make_update(updates.grad_b[bias], upd))
 
         for (weights, upd) in updates.weights_updates.items():
-            update.append(make_update(weights, upd))
-
-        b_prop = function([], updates=update)
-        return b_prop
+            update_w.append(make_update(updates.grad_w[weights], upd))
+        update = update_w
+        update.extend(update_b)
+        return function([updates.error], updates=update, on_unused_input='ignore')
 
     network = Network(layers)
 
@@ -90,7 +93,6 @@ def construct(tokens, params: Parameters):
         f_builder(lay)
     network.forward = forward_propagation(layers)
 
-    update = Updates()
     for lay in reversed(layers):
         b_builder(lay, update)
     network.back = back_propagation(update)
