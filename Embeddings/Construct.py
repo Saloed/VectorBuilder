@@ -36,7 +36,6 @@ def construct(tokens, params: Parameters, update: Updates):
     for i in range(nodes_amount):
         node = tokens[i]
         if node.parent is None: continue
-        if node.parent >= nodes_amount: continue
 
         from_layer = layers[i]
         to_layer = layers[node.parent]
@@ -71,11 +70,12 @@ def construct(tokens, params: Parameters, update: Updates):
     def back_propagation(updates: Updates):
         update_w = []
         update_b = []
+        alpha = T.fscalar('alpha')
 
         def make_update(target, upd):
             print(target)
             print(upd.type)
-            tpl = (target, target + T.mul(upd, LEARN_RATE))
+            tpl = (target, target + T.mul(upd, alpha))
             return tpl
 
         for (bias, upd) in updates.bias_updates.items():
@@ -85,7 +85,7 @@ def construct(tokens, params: Parameters, update: Updates):
             update_w.append(make_update(updates.grad_w[weights], upd))
         update = update_w
         update.extend(update_b)
-        return function([updates.error], updates=update, on_unused_input='ignore')
+        return function([updates.error, alpha], updates=update, on_unused_input='ignore')
 
     network = Network(layers)
 

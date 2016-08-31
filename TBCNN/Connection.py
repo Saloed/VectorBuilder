@@ -31,6 +31,7 @@ class Connection:
             dEdZ = self.to_layer.back
             dEdX = T.mul(T.dot(self.weights.T, dEdZ), self.w_coeff)
             dEdW = T.mul(T.dot(dEdZ, self.from_layer.forward.T), self.w_coeff)
+            print(dEdW.type)
             upd = updates.weights_updates.get(self.weights.name, None)
             if upd is not None:
                 updates.weights_updates[self.weights.name] = upd + dEdW

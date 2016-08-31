@@ -9,7 +9,6 @@ LEARN_RATE = 0.003
 MOMENTUM = 0.1
 
 
-
 class Parameters:
     def __init__(self,
                  w_left: SV, w_right: SV, embeddings):
