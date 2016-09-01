@@ -61,8 +61,8 @@ class Updates:
 
 
 class Network:
-    def __init__(self, layers):
-        self.layers = layers
+    def __init__(self):
+        # self.layers = layers
         self.forward = None
         self.back = None
 

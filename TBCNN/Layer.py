@@ -30,10 +30,10 @@ class Layer:
                 if len(self.in_connection) == 0:
                     self.y = self.bias
                 else:
-                    self.z = T.sum(connections, axis=0)
+                    self.z = T.sum(connections, axis=0, acc_dtype=theano.config.floatX)
                     self.y = self.activation(T.add(self.z, self.bias))
             else:
-                self.z = T.sum(connections, axis=0)
+                self.z = T.sum(connections, axis=0, acc_dtype=theano.config.floatX)
                 self.y = self.activation(self.z)
         else:
             self.y = T.max(connections, axis=0)
