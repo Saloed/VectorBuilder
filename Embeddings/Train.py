@@ -239,6 +239,26 @@ def fprint(print_str: list, file=log_file):
     file.flush()
 
 
+def process_batch(batch, params, alpha, is_validation):
+    try:
+        nets = prepare_networks(batch, params)
+    except Exception as exc:
+        print('exception in net preparing')
+        print(exc.__traceback__)
+        return 0, 0
+
+    try:
+        error_per_ast, error_per_token = epoch(nets, params, alpha, is_validation)
+    except Exception as exc:
+        print('exception in epoch')
+        print(exc.__traceback__)
+        return 0, 0
+    return error_per_ast, error_per_token
+
+
+batch_size = 10
+
+
 def main():
     dataset_dir = '../Dataset/'
     ast_file = open(dataset_dir + 'ast_file', mode='rb')
@@ -254,23 +274,30 @@ def main():
         params = initialize()
         try:
             for train_epoch in range(20):
+                t_error_per_token = 0
+                t_error_per_ast = 0
+                v_error_per_token = 0
+                v_error_per_ast = 0
                 shuffle(data_set)
-                train_set = deepcopy(data_set[:2])  # :len(data_ast) - 100
-                validation_set = deepcopy(data_set[2:3])  # len(data_ast) - 100:
-                try:
-                    train_nets = prepare_networks(train_set, params)
-                    valid_nets = prepare_networks(validation_set, params)
-                except Exception as exc:
-                    print('exception in net preparing')
-                    print(exc.__traceback__)
-                    continue
-                try:
-                    t_error_per_ast, t_error_per_token = epoch(train_nets, params, alpha, False)
-                    v_error_per_ast, v_error_per_token = epoch(valid_nets, params, alpha, True)
-                except Exception as exc:
-                    print('exception in epoch')
-                    print(exc.__traceback__)
-                    continue
+                train_set = deepcopy(data_set[:len(data_ast) - 100])
+                validation_set = deepcopy(data_set[len(data_ast) - 100:])
+
+                num_train = len(train_set) // batch_size
+                for bat in range(num_train - 1):
+                    temp_ast_e, temp_token_e = process_batch(
+                        train_set[bat * batch_size:(bat + 1) * batch_size],
+                        params, alpha, False)
+                    t_error_per_ast += temp_ast_e
+                    t_error_per_token += temp_token_e
+
+                num_valid = len(validation_set) // batch_size
+                for bat in range(num_valid - 1):
+                    temp_ast_e, temp_token_e = process_batch(
+                        validation_set[bat * batch_size:(bat + 1) * batch_size],
+                        params, alpha, True)
+                    v_error_per_ast += temp_ast_e
+                    v_error_per_token += temp_token_e
+
                 dtpt = prev_t_token - t_error_per_token
                 dtpa = prev_t_ast - t_error_per_ast
                 dvpt = prev_v_token - v_error_per_token
