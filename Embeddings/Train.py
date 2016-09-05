@@ -86,6 +86,19 @@ def timing(f):
     return wrap
 
 
+def safe_run(f):
+    def wrap(*args):
+        try:
+            ret = f(*args)
+        except Exception as exc:
+            print('exception in net preparing')
+            print(exc.__traceback__)
+            return None
+        return ret
+
+    return wrap
+
+
 def prepare_ast(full_ast):
     nodes_with_depth = []
 
@@ -141,16 +154,36 @@ def build_update(params: Parameters, updates: list):
     return function([alpha], updates=upd)
 
 
-class PreparedEvaluationSet:
-    def __init__(self, positive: Network, negative: list, training_token, ast_len):
+class PreparedAST:
+    def __init__(self, positive, negative: list, training_token, training_token_index, ast_len):
         self.positive = positive
         self.negative = negative
         self.training_token = training_token
+        self.training_token_index = training_token_index
         self.ast_len = ast_len
 
 
-# @timing
-def prepare_net(data, constructed_networks: list, params):
+class EvaluationSet:
+    def __init__(self, positive, negative, training_token, ast_len):
+        self.positive = positive
+        self.negative = negative
+        self.trainig_token = training_token
+        self.ast_len = ast_len
+
+
+@timing
+def prepare_net(ast: PreparedAST, params):
+    positive = construct(ast.positive, params, ast.training_token_index)
+    negative = [construct(sample, params, ast.training_token_index, True) for sample in ast.negative]
+    return EvaluationSet(positive, negative, ast.training_token, ast.ast_len)
+
+
+# num_process = os.cpu_count()
+# pool = Pool(processes=num_process)
+
+
+
+def generate_ast(data, ast_list: list):
     prepared = prepare_ast(data)
     for ast in prepared:
         ast_len = len(ast)
@@ -173,44 +206,16 @@ def prepare_net(data, constructed_networks: list, params):
 
         # rand from 1 because root_token_index is 0
         samples = [create_negative(i) for i in np.random.random_integers(1, len(ast) - 1, size=2)]
-        positive = construct(ast, params, training_token_index)
-        negative = [construct(sample, params, training_token_index, True) for sample in samples]
-        constructed_networks.append(PreparedEvaluationSet(positive, negative, training_token, ast_len))
-    return len(prepared)
 
-
-# num_process = os.cpu_count()
-# pool = Pool(processes=num_process)
-
-
-def prepare_networks(data_set, params) -> list:
-    constructed_networks = []
-    num_data = len(data_set)
-    # num_data //= num_process
-    # for batch in range(num_data):
-    #     results = [
-    #         pool.apply_async(prepare_net,
-    #                          [
-    #                              data_set[batch * i], constructed_networks, params
-    #                          ])
-    #         for i in range(num_process)
-    #         ]
-    #     for result in results:
-    #         print('constructed ', result.get(), ' networks')
-    num_rest = num_data
-    for data in data_set:
-        prepare_net(data, constructed_networks, params)
-        num_rest -= 1
-        print('constructed. rest ', num_rest)
-    return constructed_networks
+        ast_list.append(PreparedAST(ast, samples, training_token, training_token_index, ast_len))
 
 
 # @timing
-def process_network(net: PreparedEvaluationSet, params, alpha, is_validation):
+def process_network(positive, negative, params, alpha, is_validation, ast_len, training_token):
     train_error = 0
-    for neg in net.negative:
-        train_error += evaluate(net.positive, neg, net.training_token, params, alpha, is_validation)
-    return train_error / net.ast_len, train_error
+    for neg in negative:
+        train_error += evaluate(positive, neg, training_token, params, alpha, is_validation)
+    return train_error / ast_len, train_error
 
 
 # @timing
@@ -240,19 +245,6 @@ def fprint(print_str: list, file=log_file):
 
 
 def process_batch(batch, params, alpha, is_validation):
-    try:
-        nets = prepare_networks(batch, params)
-    except Exception as exc:
-        print('exception in net preparing')
-        print(exc.__traceback__)
-        return 0, 0
-
-    try:
-        error_per_ast, error_per_token = epoch(nets, params, alpha, is_validation)
-    except Exception as exc:
-        print('exception in epoch')
-        print(exc.__traceback__)
-        return 0, 0
     return error_per_ast, error_per_token
 
 
