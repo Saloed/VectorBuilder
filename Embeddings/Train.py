@@ -27,14 +27,15 @@ def fprint(print_str: list, file=log_file):
 
 # @timing
 def prepare_net(ast: PreparedAST, params):
-    if ast.eval_set is None:
-        positive = construct(ast.positive, params, ast.training_token_index)
-        negative = [
-            construct(sample, params, ast.training_token_index, True)
-            for sample in ast.negative
-            ]
-        ast.eval_set = EvaluationSet(positive, negative, ast.training_token, ast.ast_len)
-    return ast.eval_set
+    # if ast.eval_set is None:
+    positive = construct(ast.positive, params, ast.training_token_index)
+    negative = [
+        construct(sample, params, ast.training_token_index, True)
+        for sample in ast.negative
+        ]
+    # ast.eval_set =
+    return EvaluationSet(positive, negative, ast.training_token, ast.ast_len)
+    # return ast.eval_set
 
 
 @timing

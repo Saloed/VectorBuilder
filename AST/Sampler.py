@@ -15,7 +15,7 @@ class PreparedAST:
         self.training_token = training_token
         self.training_token_index = training_token_index
         self.ast_len = ast_len
-        self.eval_set = None
+        # self.eval_set = None
 
 
 def build_asts(dataset_dir):
