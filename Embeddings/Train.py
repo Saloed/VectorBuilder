@@ -1,240 +1,21 @@
-import os
 import pickle
-import theano
-import theano.tensor as T
-import time
+from copy import deepcopy
 from random import shuffle
-from theano import function
-import numpy as np
-from copy import copy, deepcopy
-from multiprocessing import Pool
-from AST.Token import Token
-from AST.Tokenizer import build_ast
-from AST.TokenMap import token_map
-from Embeddings import Parameters
-from Embeddings.InitEmbeddings import initialize
-from Embeddings.Construct import construct
 
-# theano.config.exception_verbosity = 'high'
-# theano.config.mode = 'DebugMode'
+from AST.Sampler import PreparedAST, generate_samples
+from Embeddings.Construct import construct
+from Embeddings.Evaluation import EvaluationSet, process_network
+from Embeddings.InitEmbeddings import initialize
 from Embeddings.Parameters import *
-from TBCNN.NetworkParams import Network
+from Utils.Wrappers import *
 
 theano.config.optimizer = 'fast_compile'
 theano.config.floatX = 'float32'
 
-x = T.fvector('x')
-mse = function(inputs=[x], outputs=T.mul(T.sum(T.mul(x, x)), 0.5))
-
-
-def build_asts(dataset_dir):
-    base_dir = dataset_dir
-    dataset_dir += 'java_files/'
-    files = os.listdir(dataset_dir)
-    data_ast = []
-    for file in files:
-        try:
-            ast = build_ast(dataset_dir + file)
-            data_ast.append(ast)
-        except Exception:
-            continue
-    ast_file = open(base_dir + 'ast_file', mode='wb')
-    pickle.dump(data_ast, ast_file)
-
-
-def evaluate(positive: Network, negative: Network, training_token: Token,
-             params: Parameters, alpha, is_validation):
-    pos_forward = positive.forward()
-    neg_forward = negative.forward()
-
-    target = params.embeddings[training_token.token_index].eval()
-    pos_diff = pos_forward - target
-    neg_diff = neg_forward - target
-
-    pos_mse = mse(pos_diff)
-    neg_mse = mse(neg_diff)
-
-    error = MARGIN + pos_mse - neg_mse
-
-    if error < 0:
-        return 0
-    if is_validation:
-        return error
-
-    positive.back(target, neg_forward, alpha)
-    negative.back(target, pos_forward, alpha)
-
-    return error
-
-
 # 0 because of preparing
 training_token_index = 0
-
-
-def timing(f):
-    def wrap(*args):
-        print('%s function start' % (f.__name__,))
-        time1 = time.time()
-        ret = f(*args)
-        time2 = time.time()
-        elapse = (time2 - time1) * 1000.0
-        seconds = elapse / 1000
-        millis = elapse % 1000
-        print('%s function elapse %i sec %i ms' % (f.__name__, seconds, millis))
-        return ret
-
-    return wrap
-
-
-def safe_run(f):
-    def wrap(*args):
-        try:
-            ret = f(*args)
-        except Exception as exc:
-            print('exception in net preparing')
-            print(exc.__traceback__)
-            return None
-        return ret
-
-    return wrap
-
-
-def prepare_ast(full_ast):
-    nodes_with_depth = []
-
-    def compute_depth(node: Token, depth):
-        if len(node.children) != 0:
-            nodes_with_depth.append((node, depth))
-            for child in node.children:
-                compute_depth(child, depth + 1)
-
-    compute_depth(full_ast[-1], 0)
-    nodes_with_depth.sort(key=lambda tup: tup[1])
-    nodes = [deepcopy(node[0]) for node in reversed(nodes_with_depth)]
-
-    class Indexer:
-        def __init__(self):
-            self.indexer = 0
-
-        def children(self, node: Token, ast=None, parent=None) -> list:
-            if ast is None:
-                ast = []
-                assert training_token_index == self.indexer
-            node.parent = parent
-            node.pos = self.indexer
-            ast.append(node)
-            self.indexer += 1
-            for child in node.children:
-                self.children(child, ast, node.pos)
-            return ast
-
-    return [Indexer().children(node) for node in nodes]
-
-
-def build_update(params: Parameters, updates: list):
-    upd = []
-    alpha = T.fscalar('alpha')
-    update = dict()
-    for up in updates:
-        for key, value in up.grad_w.items():
-            if key in update:
-                update[key] = update[key] + value
-            else:
-                update[key] = value
-        for key, value in up.grad_b.items():
-            if key in update:
-                update[key] = update[key] + value
-            else:
-                update[key] = value
-    for key, value in params.w.items():
-        upd.append((value, value - alpha * update[key]))
-    for value in params.embeddings:
-        key = value.name
-        upd.append((value, value - alpha * update[key]))
-    return function([alpha], updates=upd)
-
-
-class PreparedAST:
-    def __init__(self, positive, negative: list, training_token, training_token_index, ast_len):
-        self.positive = positive
-        self.negative = negative
-        self.training_token = training_token
-        self.training_token_index = training_token_index
-        self.ast_len = ast_len
-
-
-class EvaluationSet:
-    def __init__(self, positive, negative, training_token, ast_len):
-        self.positive = positive
-        self.negative = negative
-        self.trainig_token = training_token
-        self.ast_len = ast_len
-
-
-@timing
-def prepare_net(ast: PreparedAST, params):
-    positive = construct(ast.positive, params, ast.training_token_index)
-    negative = [construct(sample, params, ast.training_token_index, True) for sample in ast.negative]
-    return EvaluationSet(positive, negative, ast.training_token, ast.ast_len)
-
-
-# num_process = os.cpu_count()
-# pool = Pool(processes=num_process)
-
-
-
-def generate_ast(data, ast_list: list):
-    prepared = prepare_ast(data)
-    for ast in prepared:
-        ast_len = len(ast)
-        if ast_len < 3:
-            continue
-        training_token = ast[training_token_index]
-
-        def rand_token():
-            return list(token_map.keys())[np.random.randint(0, len(token_map))]
-
-        def create_negative(token_index):
-            sample = deepcopy(ast)
-            current = sample[token_index]
-            new_token = rand_token()
-            while current.token_type == new_token:
-                new_token = rand_token()
-            current.token_type = new_token
-            current.token_index = token_map[new_token]
-            return sample
-
-        # rand from 1 because root_token_index is 0
-        samples = [create_negative(i) for i in np.random.random_integers(1, len(ast) - 1, size=2)]
-
-        ast_list.append(PreparedAST(ast, samples, training_token, training_token_index, ast_len))
-
-
-# @timing
-def process_network(positive, negative, params, alpha, is_validation, ast_len, training_token):
-    train_error = 0
-    for neg in negative:
-        train_error += evaluate(positive, neg, training_token, params, alpha, is_validation)
-    return train_error / ast_len, train_error
-
-
-# @timing
-def epoch(prepared_networks: list, params, alpha, is_validation):
-    num_data = len(prepared_networks)
-    train_error_per_token = 0
-    train_error = 0
-
-    for net in prepared_networks:
-        error_per_token, temp_err = process_network(net, params, alpha, is_validation)
-        train_error += temp_err
-        train_error_per_token += error_per_token
-        str = ['\t|\t{}\t|\t{}\t|\t{}'.format(error_per_token, temp_err, train_error)]
-        fprint(str)
-
-    return train_error / num_data, train_error_per_token / num_data
-
-
 log_file = open('log.txt', mode='w')
+batch_size = 10
 
 
 def fprint(print_str: list, file=log_file):
@@ -244,79 +25,118 @@ def fprint(print_str: list, file=log_file):
     file.flush()
 
 
+# @timing
+def prepare_net(ast: PreparedAST, params):
+    if ast.eval_set is None:
+        positive = construct(ast.positive, params, ast.training_token_index)
+        negative = [
+            construct(sample, params, ast.training_token_index, True)
+            for sample in ast.negative
+            ]
+        ast.eval_set = EvaluationSet(positive, negative, ast.training_token, ast.ast_len)
+    return ast.eval_set
+
+
+@timing
 def process_batch(batch, params, alpha, is_validation):
+    total_t_err = 0
+    total_a_err = 0
+    samples_size = len(batch)
+    for sample in batch:
+        eval_set = prepare_net(sample, params)
+        ept, err = process_network(eval_set, params, alpha, is_validation)
+        total_t_err += ept
+        total_a_err += err
+
+    return total_a_err / samples_size, total_t_err / samples_size
+
+
+@safe_run
+def process_batches(batches, params, alpha, is_validation):
+    error_per_ast = 0
+    error_per_token = 0
+    for batch in batches:
+        epa, ept = process_batch(batch, params, alpha, is_validation)
+        str = ['\t\t|\t{}\t|\t{}'.format(ept, epa)]
+        fprint(str)
+        error_per_ast += epa
+        error_per_token += ept
     return error_per_ast, error_per_token
 
 
-batch_size = 10
+def create_batches(data):
+    samples = []
+    for ast in data:
+        generate_samples(ast, samples, training_token_index)
+    data_size = len(samples)
+    data_size //= batch_size
+    batches = [samples[i * batch_size:(i + 1) * batch_size] for i in range(data_size)]
+    return batches
+
+
+@safe_run
+def epoch_step(params, epoch_num, retry_num, prev, batches, train_set_size):
+    shuffle(batches)
+    train_set = batches[:train_set_size]
+    validation_set = batches[train_set_size:]
+    alpha, prev_t_ast, prev_t_token, prev_v_ast, prev_v_token = prev
+
+    result = process_batches(train_set, params, alpha, False)
+    if result is None:
+        return
+    t_error_per_ast, t_error_per_token = result
+
+    result = process_batches(validation_set, params, alpha, True)
+    if result is None:
+        return
+    v_error_per_ast, v_error_per_token = result
+
+    dtpt = prev_t_token - t_error_per_token
+    dtpa = prev_t_ast - t_error_per_ast
+    dvpt = prev_v_token - v_error_per_token
+    dvpa = prev_v_ast - v_error_per_ast
+    print_str = [
+        '################',
+        'end of epoch {0} retry {1}'.format(epoch_num, retry_num),
+        'train\t|\t{}\t|\t{}'.format(t_error_per_token, t_error_per_ast),
+        'delta\t|\t{}\t|\t{}'.format(dtpt, dtpa),
+        'validation\t|\t{}\t|\t{}'.format(v_error_per_token, v_error_per_ast),
+        'delta\t|\t{}\t|\t{}'.format(dvpt, dvpa),
+        '################',
+        'new epoch'
+    ]
+    fprint(print_str, log_file)
+    alpha *= 0.999
+
+    new_params = open('new_params_t' + str(retry_num) + "_ep" + str(epoch_num), mode='wb')
+    pickle.dump(params, new_params)
+    return alpha, t_error_per_ast, t_error_per_token, v_error_per_ast, v_error_per_token
+
+
+@safe_run
+def train_step(retry_num, batches, train_set_size):
+    def init_prev():
+        return LEARN_RATE * (1 - MOMENTUM), 0, 0, 0, 0
+
+    prev = init_prev()
+
+    params = initialize()
+
+    for train_epoch in range(20):
+        prev = epoch_step(params, train_epoch, retry_num, prev, batches, train_set_size)
+        if prev is None:
+            return
 
 
 def main():
     dataset_dir = '../Dataset/'
     ast_file = open(dataset_dir + 'ast_file', mode='rb')
     data_ast = pickle.load(ast_file)
+    batches = create_batches(data_ast)
+    train_set_size = (len(batches) // 10) * 8
+    print(len(batches))
     for train_retry in range(20):
-        data_set = deepcopy(data_ast)
-        alpha = LEARN_RATE * (1 - MOMENTUM)
-        prev_t_ast = 0
-        prev_t_token = 0
-        prev_v_ast = 0
-        prev_v_token = 0
-
-        params = initialize()
-        try:
-            for train_epoch in range(20):
-                t_error_per_token = 0
-                t_error_per_ast = 0
-                v_error_per_token = 0
-                v_error_per_ast = 0
-                shuffle(data_set)
-                train_set = deepcopy(data_set[:len(data_ast) - 100])
-                validation_set = deepcopy(data_set[len(data_ast) - 100:])
-
-                num_train = len(train_set) // batch_size
-                for bat in range(num_train - 1):
-                    temp_ast_e, temp_token_e = process_batch(
-                        train_set[bat * batch_size:(bat + 1) * batch_size],
-                        params, alpha, False)
-                    t_error_per_ast += temp_ast_e
-                    t_error_per_token += temp_token_e
-
-                num_valid = len(validation_set) // batch_size
-                for bat in range(num_valid - 1):
-                    temp_ast_e, temp_token_e = process_batch(
-                        validation_set[bat * batch_size:(bat + 1) * batch_size],
-                        params, alpha, True)
-                    v_error_per_ast += temp_ast_e
-                    v_error_per_token += temp_token_e
-
-                dtpt = prev_t_token - t_error_per_token
-                dtpa = prev_t_ast - t_error_per_ast
-                dvpt = prev_v_token - v_error_per_token
-                dvpa = prev_v_ast - v_error_per_ast
-                print_str = [
-                    '################',
-                    'end of epoch {0} retry {1}'.format(train_epoch, train_retry),
-                    'train\t|\t{}\t|\t{}'.format(t_error_per_token, t_error_per_ast),
-                    'delta\t|\t{}\t|\t{}'.format(dtpt, dtpa),
-                    'validation\t|\t{}\t|\t{}'.format(v_error_per_token, v_error_per_ast),
-                    'delta\t|\t{}\t|\t{}'.format(dvpt, dvpa),
-                    '################',
-                    'new epoch'
-                ]
-                fprint(print_str, log_file)
-                alpha *= 0.999
-                prev_t_token = t_error_per_token
-                prev_t_ast = t_error_per_ast
-                prev_v_token = v_error_per_token
-                prev_v_ast = v_error_per_ast
-
-                new_params = open('new_params_t' + str(train_retry) + "_ep" + str(train_epoch), mode='wb')
-                pickle.dump(params, new_params)
-        except Exception as exc:
-            print('exception in epoch loop')
-            print(exc.__traceback__)
-            continue
+        train_step(train_retry, batches, train_set_size)
 
 
 if __name__ == '__main__':
