@@ -1,15 +1,11 @@
-import theano
-from theano import function
 import theano.tensor as T
-from Embeddings.Parameters import Parameters, NUM_FEATURES, LEARN_RATE, MARGIN
-from AST.TokenMap import token_map
-import numpy as np
+from theano import function
 
+from Embeddings.Parameters import Parameters, MARGIN
+from TBCNN.Builder import compute_leaf_num
 from TBCNN.Connection import Connection
 from TBCNN.Layer import Layer
 from TBCNN.NetworkParams import Network
-from Embeddings.Parameters import Updates
-from TBCNN.Builder import compute_leaf_num
 
 
 def construct(tokens, params: Parameters, root_token_index, is_negative=False):
@@ -52,36 +48,29 @@ def construct(tokens, params: Parameters, root_token_index, is_negative=False):
             Connection(from_layer, to_layer, params.w['w_right'],
                        w_coeff=node.right_rate * node.leaf_num / tokens[node.parent].leaf_num)
 
-    def f_builder(layer):
-        if not layer.f_initialized:
+    def f_builder(layer: Layer):
+        if layer.forward is None:
             for c in layer.in_connection:
-                if not c.f_initialized:
+                if c.forward is None:
                     f_builder(c.from_layer)
                     c.build_forward()
             layer.build_forward()
 
-    def b_builder(layer, update: Updates):
-        if not layer.b_initialized:
-            for c in layer.out_connection:
-                if not c.b_initialized:
-                    b_builder(c.to_layer, update)
-                    c.build_back(update)
-            layer.build_back(update)
-
     def forward_propagation(network_layers: list):
+        f_builder(network_layers[root_token_index])
         return function([], network_layers[root_token_index].forward)
 
     def back_propagation(network_layers: list):
         alpha = T.fscalar('alpha')
         target = T.fvector('Targ')
-        oppsosite_forward = T.fvector('F')
+        opposite_forward = T.fvector('F')
 
         parameters = []
         parameters.extend(used_embeddings.values())
         parameters.extend(params.w.values())
 
         delta = network_layers[root_token_index].forward - target
-        op_delta = oppsosite_forward - target
+        op_delta = opposite_forward - target
 
         mse = T.mul(T.sum(T.mul(delta, delta)), 0.5)
         op_mse = T.mul(T.sum(T.mul(op_delta, op_delta)), 0.5)
@@ -91,27 +80,13 @@ def construct(tokens, params: Parameters, root_token_index, is_negative=False):
         else:
             error = MARGIN + mse - op_mse
 
-        # update = T.grad(error, parameters) * alpha
-        # try:
         gparams = [T.grad(error, param) for param in parameters]
-
         updates = [
             (param, param - alpha * gparam)
             for param, gparam in zip(parameters, gparams)
             ]
-        fun = function([target, oppsosite_forward, alpha], updates=updates)
-        # except theano.gradient.DisconnectedInputError as err:
-        #     for lay in layers:
-        #         print(lay.bias)
-        #     print(layers[root_token_index].in_connection)
-        #     print(layers[root_token_index].forward)
-        #     raise err
-        return fun
+        return function([target, opposite_forward, alpha], updates=updates)
 
-    # network = Network(layers)
-
-    for lay in layers:
-        f_builder(lay)
     network = Network()
     network.forward = forward_propagation(layers)
     network.back = back_propagation(layers)

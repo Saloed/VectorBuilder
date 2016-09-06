@@ -1,6 +1,7 @@
 import pickle
-from copy import deepcopy
 from random import shuffle
+
+import theano
 
 from AST.Sampler import PreparedAST, generate_samples
 from Embeddings.Construct import construct
@@ -120,9 +121,7 @@ def train_step(retry_num, batches, train_set_size):
         return LEARN_RATE * (1 - MOMENTUM), 0, 0, 0, 0
 
     prev = init_prev()
-
     params = initialize()
-
     for train_epoch in range(20):
         prev = epoch_step(params, train_epoch, retry_num, prev, batches, train_set_size)
         if prev is None:

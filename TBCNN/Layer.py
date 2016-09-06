@@ -1,12 +1,9 @@
-import numpy as np
-import theano.tensor as T
 import theano
-from theano import function
-from theano import shared
 import theano.compile
-from TBCNN.NetworkParams import Updates
-from TBCNN.NetworkParams import NUM_FEATURES, BATCH_SIZE
+import theano.tensor as T
 from theano.compile import SharedVariable as TS
+
+from TBCNN.NetworkParams import NUM_FEATURES
 
 
 class Layer:
@@ -20,54 +17,22 @@ class Layer:
         self.out_connection = []
         self.in_connection = []
         self.activation = activation
-        self.f_initialized = False
-        self.b_initialized = False
+        self.forward = None
 
     def build_forward(self):
         connections = [c.forward for c in self.in_connection]
         if not self.is_pool:
-            if self.bias is not None:
-                if len(self.in_connection) == 0:
-                    self.y = self.bias
+            if len(connections) != 0:
+                z = T.sum(connections, axis=0, acc_dtype=theano.config.floatX)
+                if self.bias is not None:
+                    y = self.activation(T.add(z, self.bias))
                 else:
-                    self.z = T.sum(connections, axis=0, acc_dtype=theano.config.floatX)
-                    self.y = self.activation(T.add(self.z, self.bias))
+                    y = self.activation(z)
             else:
-                self.z = T.sum(connections, axis=0, acc_dtype=theano.config.floatX)
-                self.y = self.activation(self.z)
+                y = self.bias
         else:
-            self.y = T.max(connections, axis=0)
-        self.forward = self.y
-        self.f_initialized = True
-
-    def build_back(self, updates: Updates):
-        if not self.is_pool:
-            connections = [c.back for c in self.out_connection]
-            if len(connections) == 0:
-                dEdY = updates.error
-                dEdZ = updates.error
-                self.back = dEdZ
-            else:
-                dEdY = T.sum(connections, axis=0)
-                dEdZ = dEdY * np.array(self.forward != 0,
-                                       dtype=theano.config.floatX)
-                if self.bias is None:
-                    self.back = dEdZ
-                else:
-                    if len(self.in_connection) == 0:
-                        dEdB = dEdY
-                    else:
-                        dEdB = T.sum(dEdZ, axis=1)
-                    bias_upd = dEdB.reshape((-1, 1))
-                    upd = updates.bias_updates.get(self.bias.name, None)
-                    if upd is not None:
-                        updates.bias_updates[self.bias.name] = upd + bias_upd
-                    else:
-                        updates.bias_updates[self.bias.name] = bias_upd
-                    self.back = dEdZ
-        else:
-            self.back = self.out_connection[0].back
-        self.b_initialized = True
+            y = T.max(connections, axis=0)
+        self.forward = y
 
 
 class PoolLayer(Layer):
