@@ -1,9 +1,6 @@
 import _pickle as c_pickle
-import os
-import gzip
 from random import shuffle
 
-import sys
 import theano
 
 from AST.Sampler import PreparedAST, generate_samples
@@ -20,8 +17,6 @@ theano.config.mode = 'FAST_COMPILE'
 training_token_index = 0
 log_file = open('log.txt', mode='w')
 batch_size = 10
-file_index = 0
-sys.setrecursionlimit(10000)
 
 
 def fprint(print_str: list, file=log_file):
@@ -31,35 +26,14 @@ def fprint(print_str: list, file=log_file):
     file.flush()
 
 
-def dump_to_file(ast: PreparedAST, eval_set: EvaluationSet):
-    global file_index
-    file_index += 1
-    f_name = str(file_index) + ".evalset"
-    ast.eval_set_file = f_name
-    f = gzip.GzipFile(filename=f_name, mode='wb')
-    c_pickle.dump(eval_set, f, protocol=-1)
-    f.close()
-
-
-def load_from_file(ast: PreparedAST) -> EvaluationSet:
-    f = gzip.GzipFile(filename=ast.eval_set_file, mode='rb')
-    eval_set = c_pickle.load(f)
-    f.close()
-    return eval_set
-
-
 # @timing
 def prepare_net(ast: PreparedAST, params):
-    if ast.eval_set_file is None:
-        positive = construct(ast.positive, params, ast.training_token_index)
-        negative = [
-            construct(sample, params, ast.training_token_index, True)
-            for sample in ast.negative
-            ]
-        eval_set = EvaluationSet(positive, negative, ast.training_token, ast.ast_len)
-        dump_to_file(ast, eval_set)
-    else:
-        eval_set = load_from_file(ast)
+    positive = construct(ast.positive, params, ast.training_token_index)
+    negative = [
+        construct(sample, params, ast.training_token_index, True)
+        for sample in ast.negative
+        ]
+    eval_set = EvaluationSet(positive, negative, ast.training_token, ast.ast_len)
     return eval_set
 
 
@@ -156,7 +130,6 @@ def main():
     dataset_dir = '../Dataset/'
     ast_file = open(dataset_dir + 'ast_file', mode='rb')
     data_ast = c_pickle.load(ast_file)
-    os.chdir("/storage/Networks/")
     batches = create_batches(data_ast[:1])
     train_set_size = len(batches) - 2  # (len(batches) // 10) * 8
     print(len(batches))
