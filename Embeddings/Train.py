@@ -130,8 +130,8 @@ def main():
     dataset_dir = '../Dataset/'
     ast_file = open(dataset_dir + 'ast_file', mode='rb')
     data_ast = c_pickle.load(ast_file)
-    batches = create_batches(data_ast[:1])
-    decay = len(batches)
+    batches = create_batches(data_ast[:2])
+    decay = 5e-5
     train_set_size = len(batches) - 2  # (len(batches) // 10) * 8
     print(len(batches))
     for train_retry in range(20):

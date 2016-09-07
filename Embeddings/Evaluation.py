@@ -25,8 +25,8 @@ def evaluate(positive: Network, negative: Network, training_token: Token,
     neg_forward = negative.forward()
 
     target = params.embeddings[training_token.token_index].eval()
-    pos_diff = pos_forward - target
-    neg_diff = neg_forward - target
+    pos_diff = target - pos_forward
+    neg_diff = target - neg_forward
 
     pos_mse = mse(pos_diff)
     neg_mse = mse(neg_diff)
@@ -39,8 +39,7 @@ def evaluate(positive: Network, negative: Network, training_token: Token,
         return error
 
     positive.back(target, neg_forward, alpha, decay)
-    negative.back(target, pos_forward, alpha, decay)
-
+    # negative.back(target, pos_forward, alpha, decay)
     return error
 
 

@@ -70,16 +70,16 @@ def construct(tokens, params: Parameters, root_token_index, is_negative=False):
         parameters.extend(used_embeddings.values())
         parameters.extend(params.w.values())
 
-        delta = network_layers[root_token_index].forward - target
-        op_delta = opposite_forward - target
+        delta = target - network_layers[root_token_index].forward
+        op_delta = target - opposite_forward
 
         mse = T.mul(T.sum(T.mul(delta, delta)), 0.5)
         op_mse = T.mul(T.sum(T.mul(op_delta, op_delta)), 0.5)
 
         if is_negative:
-            error = MARGIN + op_mse - mse
+            error = T.nnet.relu(MARGIN + op_mse - mse)
         else:
-            error = MARGIN + mse - op_mse
+            error = T.nnet.relu(MARGIN + mse - op_mse)
 
         gparams = [T.grad(error, param) for param in parameters]
         updates = [

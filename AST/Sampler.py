@@ -50,7 +50,7 @@ def prepare_ast(full_ast, training_token_index):
         def __init__(self):
             self.indexer = 0
 
-        def children(self, node: Token, ast=None, parent=None) -> list:
+        def children(self, node: Token, ast=None, parent=None, need_more=True) -> list:
             if ast is None:
                 ast = []
                 assert training_token_index == self.indexer
@@ -58,8 +58,9 @@ def prepare_ast(full_ast, training_token_index):
             node.pos = self.indexer
             ast.append(node)
             self.indexer += 1
-            for child in node.children:
-                self.children(child, ast, node.pos)
+            if need_more:
+                for child in node.children:
+                    self.children(child, ast, node.pos, need_more=False)
             return ast
 
     return [Indexer().children(node) for node in nodes]

@@ -8,7 +8,7 @@ from TBCNN.NetworkParams import NUM_FEATURES
 
 class Layer:
     def __init__(self, bias: TS, name="", feature_amount=NUM_FEATURES,
-                 activation=T.nnet.relu,
+                 activation=T.tanh,
                  is_pool=False):
         self.bias = bias
         self.name = name
