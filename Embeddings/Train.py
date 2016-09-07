@@ -38,13 +38,13 @@ def prepare_net(ast: PreparedAST, params):
 
 
 @timing
-def process_batch(batch, params, alpha, is_validation):
+def process_batch(batch, params, alpha, decay, is_validation):
     total_t_err = 0
     total_a_err = 0
     samples_size = len(batch)
     for sample in batch:
         eval_set = prepare_net(sample, params)
-        ept, err = process_network(eval_set, params, alpha, is_validation)
+        ept, err = process_network(eval_set, params, alpha, decay, is_validation)
         total_t_err += ept
         total_a_err += err
 
@@ -52,13 +52,13 @@ def process_batch(batch, params, alpha, is_validation):
 
 
 # @safe_run
-def process_batches(batches, params, alpha, is_validation):
+def process_batches(batches, params, alpha, decay, is_validation):
     error_per_ast = 0
     error_per_token = 0
     for i, batch in enumerate(batches):
-        epa, ept = process_batch(batch, params, alpha, is_validation)
-        str = ['\t\t|\t{}\t|\t{}\t|\t{}'.format(ept, epa, i)]
-        fprint(str)
+        epa, ept = process_batch(batch, params, alpha, decay, is_validation)
+        message = ['\t\t|\t{}\t|\t{}\t|\t{}'.format(ept, epa, i)]
+        fprint(message)
         error_per_ast += epa
         error_per_token += ept
     return error_per_ast, error_per_token
@@ -75,18 +75,18 @@ def create_batches(data):
 
 
 # @safe_run
-def epoch_step(params, epoch_num, retry_num, prev, batches, train_set_size):
+def epoch_step(params, epoch_num, retry_num, prev, batches, train_set_size, decay):
     # shuffle(batches)
     train_set = batches[:train_set_size]
     validation_set = batches[train_set_size:]
     alpha, prev_t_ast, prev_t_token, prev_v_ast, prev_v_token = prev
-
-    result = process_batches(train_set, params, alpha, False)
+    fprint(['train set'])
+    result = process_batches(train_set, params, alpha, decay, False)
     if result is None:
         return
     t_error_per_ast, t_error_per_token = result
-
-    result = process_batches(validation_set, params, alpha, True)
+    fprint(['validation set'])
+    result = process_batches(validation_set, params, alpha, decay, True)
     if result is None:
         return
     v_error_per_ast, v_error_per_token = result
@@ -114,14 +114,14 @@ def epoch_step(params, epoch_num, retry_num, prev, batches, train_set_size):
 
 
 # @safe_run
-def train_step(retry_num, batches, train_set_size):
+def train_step(retry_num, batches, train_set_size, decay):
     def init_prev():
         return LEARN_RATE * (1 - MOMENTUM), 0, 0, 0, 0
 
     prev = init_prev()
     params = initialize()
     for train_epoch in range(20):
-        prev = epoch_step(params, train_epoch, retry_num, prev, batches, train_set_size)
+        prev = epoch_step(params, train_epoch, retry_num, prev, batches, train_set_size, decay)
         if prev is None:
             return
 
@@ -131,10 +131,11 @@ def main():
     ast_file = open(dataset_dir + 'ast_file', mode='rb')
     data_ast = c_pickle.load(ast_file)
     batches = create_batches(data_ast[:1])
+    decay = len(batches)
     train_set_size = len(batches) - 2  # (len(batches) // 10) * 8
     print(len(batches))
     for train_retry in range(20):
-        train_step(train_retry, batches, train_set_size)
+        train_step(train_retry, batches, train_set_size, decay)
 
 
 if __name__ == '__main__':

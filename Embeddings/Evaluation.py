@@ -20,7 +20,7 @@ mse = function(inputs=[x], outputs=T.mul(T.sum(T.mul(x, x)), 0.5))
 
 
 def evaluate(positive: Network, negative: Network, training_token: Token,
-             params: Parameters, alpha, is_validation):
+             params: Parameters, alpha, decay, is_validation):
     pos_forward = positive.forward()
     neg_forward = negative.forward()
 
@@ -38,16 +38,16 @@ def evaluate(positive: Network, negative: Network, training_token: Token,
     if is_validation:
         return error
 
-    positive.back(target, neg_forward, alpha)
-    negative.back(target, pos_forward, alpha)
+    positive.back(target, neg_forward, alpha, decay)
+    negative.back(target, pos_forward, alpha, decay)
 
     return error
 
 
 # @timing
-def process_network(eval_set: EvaluationSet, params, alpha, is_validation):
+def process_network(eval_set: EvaluationSet, params, alpha, decay, is_validation):
     train_error = 0
     for neg in eval_set.negative:
         train_error += evaluate(eval_set.positive, neg,
-                                eval_set.training_token, params, alpha, is_validation)
+                                eval_set.training_token, params, alpha, decay, is_validation)
     return train_error / eval_set.ast_len, train_error

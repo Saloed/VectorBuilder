@@ -62,6 +62,7 @@ def construct(tokens, params: Parameters, root_token_index, is_negative=False):
 
     def back_propagation(network_layers: list):
         alpha = T.fscalar('alpha')
+        decay = T.fscalar('decay')
         target = T.fvector('Targ')
         opposite_forward = T.fvector('F')
 
@@ -82,10 +83,10 @@ def construct(tokens, params: Parameters, root_token_index, is_negative=False):
 
         gparams = [T.grad(error, param) for param in parameters]
         updates = [
-            (param, param - alpha * gparam)
+            (param, param - alpha * gparam - decay * alpha * param)
             for param, gparam in zip(parameters, gparams)
             ]
-        return function([target, opposite_forward, alpha], updates=updates)
+        return function([target, opposite_forward, alpha, decay], updates=updates)
 
     network = Network()
     network.forward = forward_propagation(layers)
