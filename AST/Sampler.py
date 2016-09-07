@@ -15,7 +15,7 @@ class PreparedAST:
         self.training_token = training_token
         self.training_token_index = training_token_index
         self.ast_len = ast_len
-        # self.eval_set = None
+        self.eval_set_file = None
 
 
 def build_asts(dataset_dir):
@@ -87,6 +87,6 @@ def generate_samples(data, ast_list: list, training_token_index):
             return sample
 
         # rand from 1 because root_token_index is 0
-        samples = [create_negative(i) for i in np.random.random_integers(1, len(ast) - 1, size=2)]
+        samples = [create_negative(i) for i in np.random.random_integers(1, len(ast) - 1, size=1)]
 
         ast_list.append(PreparedAST(ast, samples, training_token, training_token_index, ast_len))

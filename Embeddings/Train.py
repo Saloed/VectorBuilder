@@ -1,6 +1,9 @@
-import pickle
+import _pickle as c_pickle
+import os
+import gzip
 from random import shuffle
 
+import sys
 import theano
 
 from AST.Sampler import PreparedAST, generate_samples
@@ -10,13 +13,15 @@ from Embeddings.InitEmbeddings import initialize
 from Embeddings.Parameters import *
 from Utils.Wrappers import *
 
-theano.config.optimizer = 'fast_compile'
 theano.config.floatX = 'float32'
+theano.config.mode = 'FAST_COMPILE'
 
 # 0 because of preparing
 training_token_index = 0
 log_file = open('log.txt', mode='w')
 batch_size = 10
+file_index = 0
+sys.setrecursionlimit(10000)
 
 
 def fprint(print_str: list, file=log_file):
@@ -26,17 +31,36 @@ def fprint(print_str: list, file=log_file):
     file.flush()
 
 
+def dump_to_file(ast: PreparedAST, eval_set: EvaluationSet):
+    global file_index
+    file_index += 1
+    f_name = str(file_index) + ".evalset"
+    ast.eval_set_file = f_name
+    f = gzip.GzipFile(filename=f_name, mode='wb')
+    c_pickle.dump(eval_set, f, protocol=-1)
+    f.close()
+
+
+def load_from_file(ast: PreparedAST) -> EvaluationSet:
+    f = gzip.GzipFile(filename=ast.eval_set_file, mode='rb')
+    eval_set = c_pickle.load(f)
+    f.close()
+    return eval_set
+
+
 # @timing
 def prepare_net(ast: PreparedAST, params):
-    # if ast.eval_set is None:
-    positive = construct(ast.positive, params, ast.training_token_index)
-    negative = [
-        construct(sample, params, ast.training_token_index, True)
-        for sample in ast.negative
-        ]
-    # ast.eval_set =
-    return EvaluationSet(positive, negative, ast.training_token, ast.ast_len)
-    # return ast.eval_set
+    if ast.eval_set_file is None:
+        positive = construct(ast.positive, params, ast.training_token_index)
+        negative = [
+            construct(sample, params, ast.training_token_index, True)
+            for sample in ast.negative
+            ]
+        eval_set = EvaluationSet(positive, negative, ast.training_token, ast.ast_len)
+        dump_to_file(ast, eval_set)
+    else:
+        eval_set = load_from_file(ast)
+    return eval_set
 
 
 @timing
@@ -53,13 +77,13 @@ def process_batch(batch, params, alpha, is_validation):
     return total_a_err / samples_size, total_t_err / samples_size
 
 
-@safe_run
+# @safe_run
 def process_batches(batches, params, alpha, is_validation):
     error_per_ast = 0
     error_per_token = 0
-    for batch in batches:
+    for i, batch in enumerate(batches):
         epa, ept = process_batch(batch, params, alpha, is_validation)
-        str = ['\t\t|\t{}\t|\t{}'.format(ept, epa)]
+        str = ['\t\t|\t{}\t|\t{}\t|\t{}'.format(ept, epa, i)]
         fprint(str)
         error_per_ast += epa
         error_per_token += ept
@@ -76,9 +100,9 @@ def create_batches(data):
     return batches
 
 
-@safe_run
+# @safe_run
 def epoch_step(params, epoch_num, retry_num, prev, batches, train_set_size):
-    shuffle(batches)
+    # shuffle(batches)
     train_set = batches[:train_set_size]
     validation_set = batches[train_set_size:]
     alpha, prev_t_ast, prev_t_token, prev_v_ast, prev_v_token = prev
@@ -111,11 +135,11 @@ def epoch_step(params, epoch_num, retry_num, prev, batches, train_set_size):
     alpha *= 0.999
 
     new_params = open('new_params_t' + str(retry_num) + "_ep" + str(epoch_num), mode='wb')
-    pickle.dump(params, new_params)
+    c_pickle.dump(params, new_params)
     return alpha, t_error_per_ast, t_error_per_token, v_error_per_ast, v_error_per_token
 
 
-@safe_run
+# @safe_run
 def train_step(retry_num, batches, train_set_size):
     def init_prev():
         return LEARN_RATE * (1 - MOMENTUM), 0, 0, 0, 0
@@ -131,9 +155,10 @@ def train_step(retry_num, batches, train_set_size):
 def main():
     dataset_dir = '../Dataset/'
     ast_file = open(dataset_dir + 'ast_file', mode='rb')
-    data_ast = pickle.load(ast_file)
-    batches = create_batches(data_ast)
-    train_set_size = (len(batches) // 10) * 8
+    data_ast = c_pickle.load(ast_file)
+    os.chdir("/storage/Networks/")
+    batches = create_batches(data_ast[:1])
+    train_set_size = len(batches) - 2  # (len(batches) // 10) * 8
     print(len(batches))
     for train_retry in range(20):
         train_step(train_retry, batches, train_set_size)
