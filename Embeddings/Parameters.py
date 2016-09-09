@@ -8,10 +8,10 @@ MOMENTUM = 0.1
 
 class Parameters:
     def __init__(self,
-                 w_left: SV, w_right: SV, embeddings: list):
+                 w_left: SV, w_right: SV, b_construct: SV, embeddings: list):
         self.w = {
             'w_left': w_left,
             'w_right': w_right
         }
-
+        self.b_construct = b_construct
         self.embeddings = embeddings

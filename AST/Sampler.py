@@ -9,9 +9,8 @@ from AST.Tokenizer import build_ast
 
 
 class PreparedAST:
-    def __init__(self, positive, negative: list, training_token, training_token_index, ast_len):
+    def __init__(self, positive, training_token, training_token_index, ast_len):
         self.positive = positive
-        self.negative = negative
         self.training_token = training_token
         self.training_token_index = training_token_index
         self.ast_len = ast_len
@@ -77,17 +76,23 @@ def generate_samples(data, ast_list: list, training_token_index):
         def rand_token():
             return list(token_map.keys())[np.random.randint(0, len(token_map))]
 
-        def create_negative(token_index):
-            sample = deepcopy(ast)
-            current = sample[token_index]
-            new_token = rand_token()
-            while current.token_type == new_token:
+        assert training_token_index == 0
+        for token in ast[training_token_index + 1:]:
+            while token.token_type == training_token.token_type:
                 new_token = rand_token()
-            current.token_type = new_token
-            current.token_index = token_map[new_token]
-            return sample
+                token.token_type = new_token
+                token.token_index = token_map[new_token]
+        # def create_negative(token_index):
+        #     sample = deepcopy(ast)
+        #     current = sample[token_index]
+        #     new_token = rand_token()
+        #     while current.token_type == new_token:
+        #         new_token = rand_token()
+        #     current.token_type = new_token
+        #     current.token_index = token_map[new_token]
+        #     return sample
+        #
+        # # rand from 1 because root_token_index is 0
+        # samples = [create_negative(i) for i in np.random.random_integers(1, len(ast) - 1, size=1)]
 
-        # rand from 1 because root_token_index is 0
-        samples = [create_negative(i) for i in np.random.random_integers(1, len(ast) - 1, size=1)]
-
-        ast_list.append(PreparedAST(ast, samples, training_token, training_token_index, ast_len))
+        ast_list.append(PreparedAST(ast, training_token, training_token_index, ast_len))

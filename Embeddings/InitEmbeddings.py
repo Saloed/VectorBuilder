@@ -27,15 +27,19 @@ def initialize():
 
     weights = np.array([])
     biases = np.array([])
+    b_construct = np.array([])
 
     weights, w_left_range = init_params(weights, NUM_FEATURES * NUM_FEATURES)
     weights, w_right_range = init_params(weights, NUM_FEATURES * NUM_FEATURES)
     biases, _ = init_params(biases, NUM_FEATURES * token_amount)
+    b_construct, _ = init_params(b_construct, NUM_FEATURES)
 
     w_left = shared(np.asarray(weights[w_left_range].reshape((NUM_FEATURES, NUM_FEATURES)),
                                dtype=theano.config.floatX), 'w_left')
     w_right = shared(np.asarray(weights[w_right_range].reshape((NUM_FEATURES, NUM_FEATURES))
                                 , dtype=theano.config.floatX), 'w_right')
+    b_construct = shared(np.asarray(b_construct.reshape(NUM_FEATURES)
+                                    , dtype=theano.config.floatX), 'b_construct')
 
     embeddings = [SV] * token_amount
     for token, index in token_map.items():
@@ -44,4 +48,4 @@ def initialize():
         emb = np.asarray(biases[area], dtype=theano.config.floatX)
         embeddings[index] = shared(emb, 'emb_' + token)
 
-    return Parameters(w_left, w_right, embeddings)
+    return Parameters(w_left, w_right, b_construct, embeddings)

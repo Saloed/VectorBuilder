@@ -1,14 +1,19 @@
+from copy import deepcopy
+import numpy as np
 import theano.tensor as T
 from theano import function
 
+from AST.TokenMap import token_map
 from Embeddings.Parameters import Parameters, MARGIN
 from TBCNN.Builder import compute_leaf_num
 from TBCNN.Connection import Connection
 from TBCNN.Layer import Layer
-from TBCNN.NetworkParams import Network
+from theano.compile import SharedVariable as TS
+
+from Utils.Wrappers import timing
 
 
-def construct(tokens, params: Parameters, root_token_index, is_negative=False):
+def compute_rates(tokens):
     for i in range(len(tokens)):
         node = tokens[i]
         len_children = len(node.children)
@@ -21,15 +26,42 @@ def construct(tokens, params: Parameters, root_token_index, is_negative=False):
                     child.right_rate = child.pos / (len_children - 1.0)
                     child.left_rate = 1.0 - child.right_rate
 
+
+def random_change(tokens, layers, params, root_token):
+    def rand_token():
+        return list(token_map.keys())[np.random.randint(0, len(token_map))]
+
+    swap_token_index = np.random.randint(root_token, len(tokens))
+    root_token = tokens[root_token]
+    current = tokens[swap_token_index]
+    new_token = rand_token()
+    while current.token_type == new_token or root_token.token_type == new_token:
+        new_token = rand_token()
+    new_token_index = token_map[new_token]
+    new_emb = params.embeddings[new_token_index]
+    layers[swap_token_index].bias = new_emb
+    return new_emb, new_token_index
+
+
+def construct(tokens, params: Parameters, root_token_index, just_validation=False):
+    compute_rates(tokens)
     compute_leaf_num(tokens[root_token_index], tokens)
-    used_embeddings = dict()
     nodes_amount = len(tokens)
     # layer index equal token index
     layers = [Layer] * nodes_amount
-    leaf_amount = 0
+    used_embeddings = dict()
+
+    assert root_token_index == 0
+
+    root_token = tokens[root_token_index]
+    root_token_emb = params.embeddings[root_token.token_index]
+
+    root_layer = Layer(params.b_construct, "root_layer")
+    layers[root_token_index] = root_layer
+
     for i, node in enumerate(tokens):
-        if len(node.children) == 0:
-            leaf_amount += 1
+        if i == root_token_index:
+            continue
         emb = params.embeddings[node.token_index]
         used_embeddings[node.token_index] = emb
         layers[i] = Layer(emb, "embedding_" + str(i))
@@ -48,6 +80,12 @@ def construct(tokens, params: Parameters, root_token_index, is_negative=False):
             Connection(from_layer, to_layer, params.w['w_right'],
                        w_coeff=node.right_rate * node.leaf_num / tokens[node.parent].leaf_num)
 
+    neg_layers = deepcopy(layers)
+
+    one_more_param, token_index = random_change(tokens, neg_layers, params, root_token_index)
+    if not one_more_param in used_embeddings:
+        used_embeddings[token_index] = one_more_param
+
     def f_builder(layer: Layer):
         if layer.forward is None:
             for c in layer.in_connection:
@@ -56,40 +94,46 @@ def construct(tokens, params: Parameters, root_token_index, is_negative=False):
                     c.build_forward()
             layer.build_forward()
 
-    def forward_propagation(network_layers: list):
-        f_builder(network_layers[root_token_index])
-        return function([], network_layers[root_token_index].forward)
-
-    def back_propagation(network_layers: list):
+    # def forward_propagation(network_layers: list):
+    #     f_builder(network_layers[root_token_index])
+    #     return function([], network_layers[root_token_index].forward)
+    @timing
+    def back_propagation(pos_forward, neg_forward):
         alpha = T.fscalar('alpha')
         decay = T.fscalar('decay')
-        target = T.fvector('Targ')
-        opposite_forward = T.fvector('F')
+        target = root_token_emb
 
-        parameters = []
-        parameters.extend(used_embeddings.values())
+        parameters = [params.b_construct]
         parameters.extend(params.w.values())
+        parameters.extend(used_embeddings.values())
 
-        delta = target - network_layers[root_token_index].forward
-        op_delta = target - opposite_forward
+        pos_delta = target - pos_forward
+        neg_delta = target - neg_forward
 
-        mse = T.mul(T.sum(T.mul(delta, delta)), 0.5)
-        op_mse = T.mul(T.sum(T.mul(op_delta, op_delta)), 0.5)
+        pos_d = T.mul(T.sum(T.mul(pos_delta, pos_delta)), 0.5)
+        neg_d = T.mul(T.sum(T.mul(neg_delta, neg_delta)), 0.5)
+        error = T.nnet.relu(MARGIN + pos_d - neg_d)
 
-        if is_negative:
-            error = T.nnet.relu(MARGIN + op_mse - mse)
+        target_update = neg_forward - pos_forward
+
+        if not just_validation:
+            gparams = [T.grad(error, param) for param in parameters]
+            updates = [
+                (param, param - alpha * gparam - decay * alpha * param)
+                for param, gparam in zip(parameters, gparams)
+                ]
+            updates.append((target, target - target_update))
+
+            return function([alpha, decay], outputs=error, updates=updates)
         else:
-            error = T.nnet.relu(MARGIN + mse - op_mse)
+            return function([alpha, decay], outputs=error, on_unused_input='ignore')
 
-        gparams = [T.grad(error, param) for param in parameters]
-        updates = [
-            (param, param - alpha * gparam - decay * alpha * param)
-            for param, gparam in zip(parameters, gparams)
-            ]
-        return function([target, opposite_forward, alpha, decay], updates=updates)
+    f_builder(layers[root_token_index])
+    f_builder(neg_layers[root_token_index])
 
-    network = Network()
-    network.forward = forward_propagation(layers)
-    network.back = back_propagation(layers)
+    pos_forward = layers[root_token_index].forward
+    neg_forward = neg_layers[root_token_index].forward
 
-    return network
+    back_prop = back_propagation(pos_forward, neg_forward)
+
+    return back_prop

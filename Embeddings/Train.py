@@ -27,14 +27,10 @@ def fprint(print_str: list, file=log_file):
 
 
 # @timing
-def prepare_net(ast: PreparedAST, params):
-    positive = construct(ast.positive, params, ast.training_token_index)
-    negative = [
-        construct(sample, params, ast.training_token_index, True)
-        for sample in ast.negative
-        ]
-    eval_set = EvaluationSet(positive, negative, ast.training_token, ast.ast_len)
-    return eval_set
+def prepare_net(ast: PreparedAST, params, is_validation):
+    back_prop = construct(ast.positive, params, ast.training_token_index, is_validation)
+
+    return EvaluationSet(back_prop, ast.training_token, ast.ast_len)
 
 
 @timing
@@ -43,8 +39,8 @@ def process_batch(batch, params, alpha, decay, is_validation):
     total_a_err = 0
     samples_size = len(batch)
     for sample in batch:
-        eval_set = prepare_net(sample, params)
-        ept, err = process_network(eval_set, params, alpha, decay, is_validation)
+        eval_set = prepare_net(sample, params, is_validation)
+        ept, err = process_network(eval_set, params, alpha, decay)
         total_t_err += ept
         total_a_err += err
 
@@ -132,7 +128,7 @@ def main():
     data_ast = c_pickle.load(ast_file)
     batches = create_batches(data_ast[:2])
     decay = 5e-5
-    train_set_size = len(batches) - 2  # (len(batches) // 10) * 8
+    train_set_size = 8  # (len(batches) // 10) * 8
     print(len(batches))
     for train_retry in range(20):
         train_step(train_retry, batches, train_set_size, decay)
