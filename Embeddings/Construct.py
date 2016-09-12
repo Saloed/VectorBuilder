@@ -10,6 +10,7 @@ from TBCNN.Connection import Connection
 from TBCNN.Layer import Layer
 from theano.compile import SharedVariable as TS
 
+from Utils.Printer import print_layers
 from Utils.Wrappers import timing
 
 
@@ -27,7 +28,7 @@ def compute_rates(tokens):
                     child.left_rate = 1.0 - child.right_rate
 
 
-def random_change(tokens, layers, params, root_token, used_embeddings):
+def random_change(tokens, layers, params, root_token_index, used_embeddings):
     def rand_token():
         return list(token_map.keys())[np.random.randint(0, len(token_map))]
 
@@ -39,7 +40,7 @@ def random_change(tokens, layers, params, root_token, used_embeddings):
     new_token_index = token_map[new_token]
     new_emb = params.embeddings[new_token_index]
 
-    if swap_token_index == root_token:
+    if swap_token_index == root_token_index:
         return new_emb
     else:
         if new_emb not in used_embeddings:
@@ -91,7 +92,8 @@ def construct(tokens, params: Parameters, root_token_index, just_validation=Fals
     negative_target = random_change(tokens, neg_layers, params, root_token_index,
                                     used_embeddings)
 
-    del used_embeddings[root_token.token_index]
+    if negative_target is None:
+        negative_target = positive_target
 
     def f_builder(layer: Layer):
         if layer.forward is None:
@@ -117,11 +119,7 @@ def construct(tokens, params: Parameters, root_token_index, just_validation=Fals
         upd_params.extend(used_embeddings.values())
 
         pos_delta = pos_target - pos_forward
-
-        if neg_target is None:
-            neg_delta = neg_forward - pos_target
-        else:
-            neg_delta = neg_forward - neg_target
+        neg_delta = neg_target - neg_forward
 
         pos_d = T.mul(T.sum(T.mul(pos_delta, pos_delta)), 0.5)
         neg_d = T.mul(T.sum(T.mul(neg_delta, neg_delta)), 0.5)
@@ -133,10 +131,6 @@ def construct(tokens, params: Parameters, root_token_index, just_validation=Fals
                 (param, param - alpha * gparam - decay * alpha * param)
                 for param, gparam in zip(upd_params, gparams)
                 ]
-
-            updates.append((pos_target, pos_target - pos_delta))
-            if neg_target is not None:
-                updates.append((neg_target, neg_target - neg_delta))
 
             return function([alpha, decay], outputs=error, updates=updates)
         else:
