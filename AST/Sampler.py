@@ -60,6 +60,8 @@ def prepare_ast(full_ast, training_token_index):
             if need_more:
                 for child in node.children:
                     self.children(child, ast, node.pos, need_more=False)
+            else:
+                node.children = []
             return ast
 
     return [Indexer().children(node) for node in nodes]
@@ -69,7 +71,7 @@ def generate_samples(data, ast_list: list, training_token_index):
     prepared = prepare_ast(data, training_token_index)
     for ast in prepared:
         ast_len = len(ast)
-        if ast_len < 3 or ast_len > 25:
+        if ast_len < 20 or ast_len > 25:
             continue
         training_token = ast[training_token_index]
 
@@ -77,11 +79,11 @@ def generate_samples(data, ast_list: list, training_token_index):
             return list(token_map.keys())[np.random.randint(0, len(token_map))]
 
         assert training_token_index == 0
-        for token in ast[training_token_index + 1:]:
-            while token.token_type == training_token.token_type:
-                new_token = rand_token()
-                token.token_type = new_token
-                token.token_index = token_map[new_token]
+        # for token in ast[training_token_index + 1:]:
+        #     while token.token_type == training_token.token_type:
+        #         new_token = rand_token()
+        #         token.token_type = new_token
+        #         token.token_index = token_map[new_token]
         # def create_negative(token_index):
         #     sample = deepcopy(ast)
         #     current = sample[token_index]

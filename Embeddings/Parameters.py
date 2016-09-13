@@ -2,9 +2,9 @@ from theano.compile import SharedVariable as SV
 
 NUM_FEATURES = 30
 MARGIN = 1
-LEARN_RATE = 0.025
+LEARN_RATE = 0.003
 MOMENTUM = 0.1
-
+RANDOM_RANGE = 0.02
 
 class Parameters:
     def __init__(self,

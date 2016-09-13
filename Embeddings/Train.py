@@ -38,7 +38,8 @@ def process_batch(batch, params, alpha, decay, is_validation):
     total_t_err = 0
     total_a_err = 0
     samples_size = len(batch)
-    for sample in batch:
+    for ind, sample in enumerate(batch):
+        print(ind)
         eval_set = prepare_net(sample, params, is_validation)
         ept, err = process_network(eval_set, params, alpha, decay)
         total_t_err += ept
@@ -71,11 +72,11 @@ def create_batches(data):
 
 
 # @safe_run
-def epoch_step(params, epoch_num, retry_num, prev, batches, train_set_size, decay):
+def epoch_step(params, epoch_num, retry_num, tparams, batches, train_set_size, decay):
     # shuffle(batches)
-    train_set = batches[:train_set_size]
-    validation_set = batches[train_set_size:]
-    alpha, prev_t_ast, prev_t_token, prev_v_ast, prev_v_token = prev
+    train_set = batches[0:1]
+    validation_set = batches[0:1]
+    alpha, prev_t_ast, prev_t_token, prev_v_ast, prev_v_token = tparams
     fprint(['train set'])
     result = process_batches(train_set, params, alpha, decay, False)
     if result is None:
@@ -104,21 +105,24 @@ def epoch_step(params, epoch_num, retry_num, prev, batches, train_set_size, deca
     fprint(print_str, log_file)
     alpha *= 0.999
 
-    new_params = open('new_params_t' + str(retry_num) + "_ep" + str(epoch_num), mode='wb')
+    new_params = open('NewParams/new_params_t' + str(retry_num) + "_ep" + str(epoch_num), mode='wb')
     c_pickle.dump(params, new_params)
-    return alpha, t_error_per_ast, t_error_per_token, v_error_per_ast, v_error_per_token
+
+    return TrainingParams(alpha, t_error_per_ast, t_error_per_token, v_error_per_ast, v_error_per_token)
+
+
+from collections import namedtuple
+
+TrainingParams = namedtuple('TrainingParams', ['alpha', 'prev_t_ast', 'prev_t_token', 'prev_v_ast', 'prev_v_token'])
 
 
 # @safe_run
 def train_step(retry_num, batches, train_set_size, decay):
-    def init_prev():
-        return LEARN_RATE * (1 - MOMENTUM), 0, 0, 0, 0
-
-    prev = init_prev()
-    params = initialize()
+    tparams = TrainingParams(LEARN_RATE * (1 - MOMENTUM), 0, 0, 0, 0)
+    nparams = initialize()
     for train_epoch in range(20):
-        prev = epoch_step(params, train_epoch, retry_num, prev, batches, train_set_size, decay)
-        if prev is None:
+        tparams = epoch_step(nparams, train_epoch, retry_num, tparams, batches, train_set_size, decay)
+        if tparams is None:
             return
 
 
@@ -126,7 +130,7 @@ def main():
     dataset_dir = '../Dataset/'
     ast_file = open(dataset_dir + 'ast_file', mode='rb')
     data_ast = c_pickle.load(ast_file)
-    batches = create_batches(data_ast[:2])
+    batches = create_batches(data_ast[0:100])
     decay = 5e-5
     train_set_size = 8  # (len(batches) // 10) * 8
     print(len(batches))

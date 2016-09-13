@@ -2,9 +2,10 @@ from copy import deepcopy
 import numpy as np
 import theano.tensor as T
 from theano import function
+import theano.printing
 
 from AST.TokenMap import token_map
-from Embeddings.Parameters import Parameters, MARGIN
+from Embeddings.Parameters import Parameters, MARGIN, LEARN_RATE
 from TBCNN.Builder import compute_leaf_num
 from TBCNN.Connection import Connection
 from TBCNN.Layer import Layer
@@ -12,6 +13,8 @@ from theano.compile import SharedVariable as TS
 
 from Utils.Printer import print_layers
 from Utils.Wrappers import timing
+
+debug_file = open('debuf_file.txt', 'w')
 
 
 def compute_rates(tokens):
@@ -28,43 +31,33 @@ def compute_rates(tokens):
                     child.left_rate = 1.0 - child.right_rate
 
 
-def random_change(tokens, layers, params, root_token_index, used_embeddings):
+def random_change(tokens, root_token_index):
     def rand_token():
         return list(token_map.keys())[np.random.randint(0, len(token_map))]
 
-    swap_token_index = np.random.randint(0, len(tokens))
-    current = tokens[swap_token_index]
+    change_index = np.random.randint(root_token_index + 1, len(tokens))
+    current = tokens[change_index]
     new_token = rand_token()
     while current.token_type == new_token:
         new_token = rand_token()
-    new_token_index = token_map[new_token]
-    new_emb = params.embeddings[new_token_index]
-
-    if swap_token_index == root_token_index:
-        return new_emb
-    else:
-        if new_emb not in used_embeddings:
-            used_embeddings[new_token_index] = new_emb
-        layers[swap_token_index].bias = new_emb
-        return None
+    current.token_type = new_token
+    current.token_index = token_map[new_token]
+    return tokens
 
 
-def construct(tokens, params: Parameters, root_token_index, just_validation=False):
-    compute_rates(tokens)
-    compute_leaf_num(tokens[root_token_index], tokens)
+def build_net(tokens, params: Parameters, root_token_index, used_embeddings):
     nodes_amount = len(tokens)
     # layer index equal token index
-    layers = [Layer] * nodes_amount
-    used_embeddings = dict()
+    layers = [None] * nodes_amount
 
     assert root_token_index == 0
 
     root_token = tokens[root_token_index]
     positive_target = params.embeddings[root_token.token_index]
-
+    used_embeddings[root_token.token_index] = positive_target
     root_layer = Layer(params.b_construct, "root_layer")
     layers[root_token_index] = root_layer
-    used_embeddings[root_token.token_index] = positive_target
+    used_embeddings['b_construct'] = params.b_construct
 
     for i, node in enumerate(tokens):
         if i == root_token_index:
@@ -87,13 +80,17 @@ def construct(tokens, params: Parameters, root_token_index, just_validation=Fals
             Connection(from_layer, to_layer, params.w['w_right'],
                        w_coeff=node.right_rate * node.leaf_num / tokens[node.parent].leaf_num)
 
-    neg_layers = deepcopy(layers)
+    return positive_target, layers
 
-    negative_target = random_change(tokens, neg_layers, params, root_token_index,
-                                    used_embeddings)
 
-    if negative_target is None:
-        negative_target = positive_target
+def construct(tokens, params: Parameters, root_token_index, just_validation=False):
+    work_tokens = deepcopy(tokens)
+    compute_rates(work_tokens)
+    compute_leaf_num(work_tokens[root_token_index], work_tokens)
+    used_embeddings = {}
+    positive_target, positive_layers = build_net(work_tokens, params, root_token_index, used_embeddings)
+    random_change(work_tokens, root_token_index)
+    negative_target, negative_layers = build_net(work_tokens, params, root_token_index, used_embeddings)
 
     def f_builder(layer: Layer):
         if layer.forward is None:
@@ -111,36 +108,82 @@ def construct(tokens, params: Parameters, root_token_index, just_validation=Fals
     def back_propagation(pos_forward, neg_forward):
         alpha = T.fscalar('alpha')
         decay = T.fscalar('decay')
+
         pos_target = positive_target
         neg_target = negative_target
 
-        upd_params = [params.b_construct]
-        upd_params.extend(params.w.values())
-        upd_params.extend(used_embeddings.values())
+        pos_delta = pos_forward - pos_target
+        neg_delta = neg_forward - neg_target
 
-        pos_delta = pos_target - pos_forward
-        neg_delta = neg_target - neg_forward
+        pos_d = T.std(pos_delta) * 0.5
+        neg_d = T.std(neg_delta) * 0.5
 
-        pos_d = T.mul(T.sum(T.mul(pos_delta, pos_delta)), 0.5)
-        neg_d = T.mul(T.sum(T.mul(neg_delta, neg_delta)), 0.5)
+        p_len = T.std(pos_forward)
+        n_len = T.std(neg_forward)
+
         error = T.nnet.relu(MARGIN + pos_d - neg_d)
-
+        # error = pos_d
+        # print("positive target ", pos_target)
+        # print(pos_target.eval())
+        # print("positive forward")
+        # print(pos_forward.eval())
+        print("positive distance ", pos_d.eval())
+        print("positive forward length ", p_len.eval())
+        # print("negative target ", neg_target)
+        # print(neg_target.eval())
+        # print("negative forward")
+        # print(neg_forward.eval())
+        print("negative distance ", neg_d.eval())
+        print("negative forward length ", n_len.eval())
+        print("error ", error.eval())
+        print("----------------------------------")
         if not just_validation:
-            gparams = [T.grad(error, param) for param in upd_params]
-            updates = [
-                (param, param - alpha * gparam - decay * alpha * param)
-                for param, gparam in zip(upd_params, gparams)
-                ]
 
-            return function([alpha, decay], outputs=error, updates=updates)
+            def prepare_updates(variables: dict, updates: dict):
+                for key, value in variables.items():
+                    upd = alpha * T.grad(error, value)  # + decay * alpha * value
+                    updates[key] = (upd if key not in updates else updates[key] + upd)
+
+            def build_updates(variables: dict, updates_values: dict, updates: list):
+                for key, value in variables.items():
+                    updates.append((value, value - updates_values[key]))
+
+            updates_values = {}
+            prepare_updates(params.w, updates_values)
+            prepare_updates(used_embeddings, updates_values)
+
+            # for upd in updates_values.items():
+            #     print(upd[0])
+            #     print(upd[1].eval({alpha: LEARN_RATE}))
+
+            # pos_index = targets['positive']
+            # neg_index = targets['negative']
+
+            # updates_values[pos_index] = (
+            #     pos_delta)  # if pos_index not in updates_values else updates_values[pos_index] + pos_delta)
+            # updates_values[neg_index] = (
+            #     neg_delta)  # if neg_index not in updates_values else updates_values[neg_index] + neg_delta)
+
+            updates = []
+            # used_embeddings[pos_index] = pos_target
+            # used_embeddings[neg_index] = neg_target
+            build_updates(params.w, updates_values, updates)
+            build_updates(used_embeddings, updates_values, updates)
+
+            # for upd in updates:
+            #     print(upd[0])
+            #     print(upd[1].eval({alpha: 0.003, decay: 5e-5}))
+            #     theano.printing.debugprint(upd, file=debug_file)
+
+            return function([alpha, decay], outputs=error, updates=updates, on_unused_input='ignore')
         else:
             return function([alpha, decay], outputs=error, on_unused_input='ignore')
 
-    f_builder(layers[root_token_index])
-    f_builder(neg_layers[root_token_index])
+    f_builder(positive_layers[root_token_index])
+    f_builder(negative_layers[root_token_index])
 
-    pos_forward = layers[root_token_index].forward
-    neg_forward = neg_layers[root_token_index].forward
+    pos_forward = positive_layers[root_token_index].forward
+    neg_forward = negative_layers[root_token_index].forward
 
     back_prop = back_propagation(pos_forward, neg_forward)
 

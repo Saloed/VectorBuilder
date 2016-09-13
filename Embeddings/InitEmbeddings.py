@@ -15,10 +15,10 @@ def init_params(old_weights, amount=None, new_weights=None, upper=None, lower=No
         old_weights = np.concatenate((old_weights, new_weights.reshape(-1)))
     else:
         if upper is None or lower is None:
-            upper = -.002
-            lower = 0.002
-        tmp_weights = randomizer.uniform(lower, upper, amount)
-        old_weights = np.concatenate((old_weights, tmp_weights.reshape(-1)))
+            upper = RANDOM_RANGE
+            lower = -RANDOM_RANGE
+        rnd_weights = randomizer.uniform(lower, upper, amount)
+        old_weights = np.concatenate((old_weights, rnd_weights.reshape(-1)))
     return old_weights, range(old_len, old_len + amount)
 
 
@@ -26,12 +26,12 @@ def initialize():
     token_amount = len(token_map)
 
     weights = np.array([])
-    biases = np.array([])
+    embeddings = np.array([])
     b_construct = np.array([])
 
     weights, w_left_range = init_params(weights, NUM_FEATURES * NUM_FEATURES)
     weights, w_right_range = init_params(weights, NUM_FEATURES * NUM_FEATURES)
-    biases, _ = init_params(biases, NUM_FEATURES * token_amount)
+    embeddings, _ = init_params(embeddings, NUM_FEATURES * token_amount)
     b_construct, _ = init_params(b_construct, NUM_FEATURES)
 
     w_left = shared(np.asarray(weights[w_left_range].reshape((NUM_FEATURES, NUM_FEATURES)),
@@ -41,11 +41,11 @@ def initialize():
     b_construct = shared(np.asarray(b_construct.reshape(NUM_FEATURES)
                                     , dtype=theano.config.floatX), 'b_construct')
 
-    embeddings = [SV] * token_amount
+    shared_embs = [None] * token_amount
     for token, index in token_map.items():
         target = index * NUM_FEATURES
         area = range(target, target + NUM_FEATURES)
-        emb = np.asarray(biases[area], dtype=theano.config.floatX)
-        embeddings[index] = shared(emb, 'emb_' + token)
+        emb = np.asarray(embeddings[area], dtype=theano.config.floatX)
+        shared_embs[index] = shared(emb, 'emb_' + token)
 
-    return Parameters(w_left, w_right, b_construct, embeddings)
+    return Parameters(w_left, w_right, b_construct, shared_embs)
