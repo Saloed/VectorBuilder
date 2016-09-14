@@ -6,11 +6,10 @@ import theano.printing
 
 from AST.TokenMap import token_map
 from AST.Tokenizer import print_tokens
-from Embeddings.Parameters import Parameters, MARGIN, LEARN_RATE
+from Embeddings.Parameters import Parameters, MARGIN, LEARN_RATE, MOMENTUM
 from TBCNN.Builder import compute_leaf_num
 from TBCNN.Connection import Connection
 from TBCNN.Layer import Layer
-from theano.compile import SharedVariable as TS
 
 from Utils.Printer import print_layers
 from Utils.Wrappers import timing
@@ -156,7 +155,7 @@ def construct(tokens, params: Parameters, root_token_index, just_validation=Fals
 
             # for upd in updates_values.items():
             #     print(upd[0])
-            #     print(upd[1].eval({alpha: LEARN_RATE}))
+            #     print(upd[1].eval({alpha: LEARN_RATE * (1 - MOMENTUM)}))
 
             # pos_index = targets['positive']
             # neg_index = targets['negative']
@@ -186,11 +185,14 @@ def construct(tokens, params: Parameters, root_token_index, just_validation=Fals
 
     pos_forward = positive_layers[root_token_index].forward
 
-    # theano.printing.pydotprint(pos_forward, 'nn_graph.png')
-    # print_tokens(tokens)
+    theano.printing.pydotprint(pos_forward, 'nn_graph.png')
+    print_tokens(tokens)
     # raise Exception
     # neg_forward = negative_layers[root_token_index].forward
 
     back_prop = back_propagation(pos_forward, None)
+
+    theano.printing.pydotprint(back_prop, 'nn_back_prop.png')
+    raise Exception
 
     return back_prop
