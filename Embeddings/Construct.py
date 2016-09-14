@@ -5,6 +5,7 @@ from theano import function
 import theano.printing
 
 from AST.TokenMap import token_map
+from AST.Tokenizer import print_tokens
 from Embeddings.Parameters import Parameters, MARGIN, LEARN_RATE
 from TBCNN.Builder import compute_leaf_num
 from TBCNN.Connection import Connection
@@ -27,7 +28,7 @@ def compute_rates(tokens):
                     child.left_rate = .5
                     child.right_rate = .5
                 else:
-                    child.right_rate = child.pos / (len_children - 1.0)
+                    child.right_rate = (child.pos - 1.0) / (len_children - 1.0)
                     child.left_rate = 1.0 - child.right_rate
 
 
@@ -89,8 +90,9 @@ def construct(tokens, params: Parameters, root_token_index, just_validation=Fals
     compute_leaf_num(work_tokens[root_token_index], work_tokens)
     used_embeddings = {}
     positive_target, positive_layers = build_net(work_tokens, params, root_token_index, used_embeddings)
-    random_change(work_tokens, root_token_index)
-    negative_target, negative_layers = build_net(work_tokens, params, root_token_index, used_embeddings)
+
+    # random_change(work_tokens, root_token_index)
+    # negative_target, negative_layers = build_net(work_tokens, params, root_token_index, used_embeddings)
 
     def f_builder(layer: Layer):
         if layer.forward is None:
@@ -110,19 +112,19 @@ def construct(tokens, params: Parameters, root_token_index, just_validation=Fals
         decay = T.fscalar('decay')
 
         pos_target = positive_target
-        neg_target = negative_target
+        # neg_target = negative_target
 
         pos_delta = pos_forward - pos_target
-        neg_delta = neg_forward - neg_target
+        # neg_delta = neg_forward - neg_target
 
         pos_d = T.std(pos_delta) * 0.5
-        neg_d = T.std(neg_delta) * 0.5
+        # neg_d = T.std(neg_delta) * 0.5
 
         p_len = T.std(pos_forward)
-        n_len = T.std(neg_forward)
+        # n_len = T.std(neg_forward)
 
-        error = T.nnet.relu(MARGIN + pos_d - neg_d)
-        # error = pos_d
+        # error = T.sqr(MARGIN + pos_d - neg_d)
+        error = pos_d
         # print("positive target ", pos_target)
         # print(pos_target.eval())
         # print("positive forward")
@@ -133,8 +135,8 @@ def construct(tokens, params: Parameters, root_token_index, just_validation=Fals
         # print(neg_target.eval())
         # print("negative forward")
         # print(neg_forward.eval())
-        print("negative distance ", neg_d.eval())
-        print("negative forward length ", n_len.eval())
+        # print("negative distance ", neg_d.eval())
+        # print("negative forward length ", n_len.eval())
         print("error ", error.eval())
         print("----------------------------------")
         if not just_validation:
@@ -180,11 +182,15 @@ def construct(tokens, params: Parameters, root_token_index, just_validation=Fals
             return function([alpha, decay], outputs=error, on_unused_input='ignore')
 
     f_builder(positive_layers[root_token_index])
-    f_builder(negative_layers[root_token_index])
+    # f_builder(negative_layers[root_token_index])
 
     pos_forward = positive_layers[root_token_index].forward
-    neg_forward = negative_layers[root_token_index].forward
 
-    back_prop = back_propagation(pos_forward, neg_forward)
+    # theano.printing.pydotprint(pos_forward, 'nn_graph.png')
+    # print_tokens(tokens)
+    # raise Exception
+    # neg_forward = negative_layers[root_token_index].forward
+
+    back_prop = back_propagation(pos_forward, None)
 
     return back_prop

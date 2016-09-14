@@ -4,7 +4,7 @@ from AST.TokenMap import token_map
 from theano import shared
 from theano.compile import SharedVariable as SV, theano
 
-randomizer = np.random.RandomState(314)
+randomizer = np.random.RandomState(100)
 
 
 def init_params(old_weights, amount=None, new_weights=None, upper=None, lower=None):

@@ -71,7 +71,7 @@ def generate_samples(data, ast_list: list, training_token_index):
     prepared = prepare_ast(data, training_token_index)
     for ast in prepared:
         ast_len = len(ast)
-        if ast_len < 20 or ast_len > 25:
+        if ast_len < 3 or ast_len > 25:
             continue
         training_token = ast[training_token_index]
 

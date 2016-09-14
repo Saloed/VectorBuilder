@@ -41,6 +41,15 @@ def print_ast(ast, shift=""):
         return
 
 
+def print_tokens(tokens):
+    def print_token(token, shift=""):
+        print(shift, token.token_type)
+        for child in token.children:
+            print_token(child, shift + "\t")
+
+    print_token(tokens[0])
+
+
 def build_ast(filename) -> list:
     file = open(filename, 'r')
     code = ""

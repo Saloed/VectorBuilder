@@ -38,12 +38,15 @@ def process_batch(batch, params, alpha, decay, is_validation):
     total_t_err = 0
     total_a_err = 0
     samples_size = len(batch)
-    for ind, sample in enumerate(batch):
-        print(ind)
-        eval_set = prepare_net(sample, params, is_validation)
-        ept, err = process_network(eval_set, params, alpha, decay)
-        total_t_err += ept
-        total_a_err += err
+    # for ind, sample in enumerate(batch):
+    #     print(ind)
+    #     eval_set = prepare_net(sample, params, is_validation)
+    #     ept, err = process_network(eval_set, params, alpha, decay)
+    #     total_t_err += ept
+    #     total_a_err += err
+
+    eval_set = prepare_net(batch[0], params, is_validation)
+    ept, err = process_network(eval_set, params, alpha, decay)
 
     return total_a_err / samples_size, total_t_err / samples_size
 

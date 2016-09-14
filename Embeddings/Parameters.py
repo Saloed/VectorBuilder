@@ -4,7 +4,7 @@ NUM_FEATURES = 30
 MARGIN = 1
 LEARN_RATE = 0.003
 MOMENTUM = 0.1
-RANDOM_RANGE = 0.02
+RANDOM_RANGE = 0.2
 
 class Parameters:
     def __init__(self,
