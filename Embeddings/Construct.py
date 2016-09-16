@@ -90,8 +90,8 @@ def construct(tokens, params: Parameters, root_token_index, just_validation=Fals
     used_embeddings = {}
     positive_target, positive_layers = build_net(work_tokens, params, root_token_index, used_embeddings)
 
-    # random_change(work_tokens, root_token_index)
-    # negative_target, negative_layers = build_net(work_tokens, params, root_token_index, used_embeddings)
+    random_change(work_tokens, root_token_index)
+    negative_target, negative_layers = build_net(work_tokens, params, root_token_index, used_embeddings)
 
     def f_builder(layer: Layer):
         if layer.forward is None:
@@ -111,19 +111,19 @@ def construct(tokens, params: Parameters, root_token_index, just_validation=Fals
         decay = T.fscalar('decay')
 
         pos_target = positive_target
-        # neg_target = negative_target
+        neg_target = negative_target
 
         pos_delta = pos_forward - pos_target
-        # neg_delta = neg_forward - neg_target
+        neg_delta = neg_forward - neg_target
 
         pos_d = T.std(pos_delta) * 0.5
-        # neg_d = T.std(neg_delta) * 0.5
+        neg_d = T.std(neg_delta) * 0.5
 
         p_len = T.std(pos_forward)
-        # n_len = T.std(neg_forward)
+        n_len = T.std(neg_forward)
 
-        # error = T.sqr(MARGIN + pos_d - neg_d)
-        error = pos_d
+        error = T.sqr(MARGIN + pos_d - neg_d)
+        # error = pos_d
         # print("positive target ", pos_target)
         # print(pos_target.eval())
         # print("positive forward")
@@ -134,15 +134,15 @@ def construct(tokens, params: Parameters, root_token_index, just_validation=Fals
         # print(neg_target.eval())
         # print("negative forward")
         # print(neg_forward.eval())
-        # print("negative distance ", neg_d.eval())
-        # print("negative forward length ", n_len.eval())
+        print("negative distance ", neg_d.eval())
+        print("negative forward length ", n_len.eval())
         print("error ", error.eval())
         print("----------------------------------")
         if not just_validation:
 
             def prepare_updates(variables: dict, updates: dict):
                 for key, value in variables.items():
-                    upd = alpha * T.grad(error, value)  # + decay * alpha * value
+                    upd = alpha * T.grad(error, value) + decay * alpha * value
                     updates[key] = (upd if key not in updates else updates[key] + upd)
 
             def build_updates(variables: dict, updates_values: dict, updates: list):
@@ -178,21 +178,21 @@ def construct(tokens, params: Parameters, root_token_index, just_validation=Fals
 
             return function([alpha, decay], outputs=error, updates=updates, on_unused_input='ignore')
         else:
-            return function([alpha, decay], outputs=error, on_unused_input='ignore')
+            return function([], outputs=error, on_unused_input='ignore')
 
     f_builder(positive_layers[root_token_index])
-    # f_builder(negative_layers[root_token_index])
+    f_builder(negative_layers[root_token_index])
 
     pos_forward = positive_layers[root_token_index].forward
 
-    theano.printing.pydotprint(pos_forward, 'nn_graph.png')
-    print_tokens(tokens)
+    # theano.printing.pydotprint(pos_forward, 'nn_graph.png')
+    # print_tokens(tokens)
     # raise Exception
-    # neg_forward = negative_layers[root_token_index].forward
+    neg_forward = negative_layers[root_token_index].forward
 
-    back_prop = back_propagation(pos_forward, None)
+    back_prop = back_propagation(pos_forward, neg_forward)
 
-    theano.printing.pydotprint(back_prop, 'nn_back_prop.png')
-    raise Exception
+    # theano.printing.pydotprint(back_prop, 'nn_back_prop.png')
+    # raise Exception
 
     return back_prop
