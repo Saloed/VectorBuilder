@@ -45,7 +45,7 @@ def random_change(tokens, root_token_index):
     return tokens
 
 
-def build_net(tokens, params: Parameters, root_token_index, used_embeddings):
+def build_net(tokens, params: Parameters, root_token_index, used_embeddings, change_index=-1, secret_param=None):
     nodes_amount = len(tokens)
     # layer index equal token index
     layers = [None] * nodes_amount
@@ -62,9 +62,12 @@ def build_net(tokens, params: Parameters, root_token_index, used_embeddings):
     for i, node in enumerate(tokens):
         if i == root_token_index:
             continue
-        emb = params.embeddings[node.token_index]
-        used_embeddings[node.token_index] = emb
-        layers[i] = Layer(emb, "embedding_" + str(i))
+        if i == change_index:
+            layers[i] = Layer(secret_param, "embedding_" + secret_param.name)
+        else:
+            emb = params.embeddings[node.token_index]
+            used_embeddings[node.token_index] = emb
+            layers[i] = Layer(emb, "embedding_" + str(i))
 
     for i in range(nodes_amount):
         node = tokens[i]
@@ -89,9 +92,11 @@ def construct(tokens, params: Parameters, root_token_index, just_validation=Fals
     compute_leaf_num(work_tokens[root_token_index], work_tokens)
     used_embeddings = {}
     positive_target, positive_layers = build_net(work_tokens, params, root_token_index, used_embeddings)
-
-    random_change(work_tokens, root_token_index)
-    negative_target, negative_layers = build_net(work_tokens, params, root_token_index, used_embeddings)
+    change_index = np.random.randint(root_token_index + 1, len(tokens))
+    # random_change(work_tokens, root_token_index)
+    secret_param = T.fvector('secret')
+    negative_target, negative_layers = build_net(work_tokens, params, root_token_index, used_embeddings, change_index,
+                                                 secret_param)
 
     def f_builder(layer: Layer):
         if layer.forward is None:
@@ -128,16 +133,16 @@ def construct(tokens, params: Parameters, root_token_index, just_validation=Fals
         # print(pos_target.eval())
         # print("positive forward")
         # print(pos_forward.eval())
-        print("positive distance ", pos_d.eval())
-        print("positive forward length ", p_len.eval())
+        # print("positive distance ", pos_d.eval())
+        # print("positive forward length ", p_len.eval())
         # print("negative target ", neg_target)
         # print(neg_target.eval())
         # print("negative forward")
         # print(neg_forward.eval())
-        print("negative distance ", neg_d.eval())
-        print("negative forward length ", n_len.eval())
-        print("error ", error.eval())
-        print("----------------------------------")
+        # print("negative distance ", neg_d.eval())
+        # print("negative forward length ", n_len.eval())
+        # print("error ", error.eval())
+        # print("----------------------------------")
         if not just_validation:
 
             def prepare_updates(variables: dict, updates: dict):
@@ -176,9 +181,9 @@ def construct(tokens, params: Parameters, root_token_index, just_validation=Fals
             #     print(upd[1].eval({alpha: 0.003, decay: 5e-5}))
             #     theano.printing.debugprint(upd, file=debug_file)
 
-            return function([alpha, decay], outputs=error, updates=updates, on_unused_input='ignore')
+            return function([secret_param, alpha, decay], outputs=error, updates=updates, on_unused_input='ignore')
         else:
-            return function([], outputs=error, on_unused_input='ignore')
+            return function([secret_param], outputs=error, on_unused_input='ignore')
 
     f_builder(positive_layers[root_token_index])
     f_builder(negative_layers[root_token_index])

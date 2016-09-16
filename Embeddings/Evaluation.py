@@ -1,6 +1,6 @@
 import theano.tensor as T
 from theano import function
-
+import numpy as np
 from AST.Sampler import PreparedAST
 from AST.Token import Token
 from Embeddings.Parameters import *
@@ -16,9 +16,11 @@ class EvaluationSet:
 
 
 # @timing
-def process_network(eval_set: EvaluationSet, alpha, decay, is_validation):
+def process_network(eval_set: EvaluationSet, params: Parameters, alpha, decay, is_validation):
+    change = np.random.randint(0, len(params.embeddings) - 1)
+    secret = params.embeddings[change].eval()
     if not is_validation:
-        train_error = eval_set.back_prop(alpha, decay)
+        train_error = eval_set.back_prop(secret, alpha, decay)
     else:
-        train_error = eval_set.validation()
+        train_error = eval_set.validation(secret)
     return train_error / eval_set.sample.ast_len, train_error
