@@ -127,7 +127,7 @@ def construct(tokens, params: Parameters, root_token_index, just_validation=Fals
         p_len = T.std(pos_forward)
         n_len = T.std(neg_forward)
 
-        error = T.sqr(MARGIN + pos_d - neg_d)
+        error = T.nnet.relu(MARGIN + pos_d - neg_d)
         # error = pos_d
         # print("positive target ", pos_target)
         # print(pos_target.eval())
