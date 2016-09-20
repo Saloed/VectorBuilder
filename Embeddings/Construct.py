@@ -14,7 +14,7 @@ from TBCNN.Layer import Layer
 from Utils.Printer import print_layers
 from Utils.Wrappers import timing
 
-debug_file = open('debuf_file.txt', 'w')
+# debug_file = open('debuf_file.txt', 'w')
 
 
 def compute_rates(tokens):
