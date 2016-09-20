@@ -10,7 +10,6 @@ from Embeddings.Parameters import Parameters, MARGIN, LEARN_RATE, MOMENTUM
 from TBCNN.Builder import compute_leaf_num
 from TBCNN.Connection import Connection
 from TBCNN.Layer import Layer
-
 from Utils.Printer import print_layers
 from Utils.Wrappers import timing
 
