@@ -1,13 +1,12 @@
 import _pickle as c_pickle
 from random import shuffle
-import matplotlib.pyplot as plotter
 import theano
-import numpy as np
 from AST.Sampler import PreparedAST, generate_samples
 from Embeddings.Construct import construct
 from Embeddings.Evaluation import EvaluationSet, process_network, EvaluationSet
 from Embeddings.InitEmbeddings import initialize
 from Embeddings.Parameters import *
+from Utils.Visualization import new_figure, update_figure, save_to_file
 from Utils.Wrappers import *
 from collections import namedtuple
 
@@ -126,30 +125,6 @@ TrainingParams = namedtuple('TrainingParams',
                             ['alpha', 'prev_t_ast', 'prev_t_token', 'prev_v_ast', 'prev_v_token', 'error_to_print'])
 
 
-def new_figure(num):
-    x = np.arange(0, EPOCH_IN_RETRY, 1)
-    y = np.full(EPOCH_IN_RETRY, -1.1)
-    fig = plotter.figure(num)
-    fig.set_size_inches(1920, 1080)
-    ax = fig.add_subplot(1, 1, 1)
-    ax.set_xlim(0, EPOCH_IN_RETRY)
-    ax.set_ylim(0, 1.1)
-    ax.set_xlabel('epoch')
-    ax.set_ylabel('validation error')
-    ax.grid(True)
-    line, = ax.plot(x, y, '.', color='r')
-    fig.show(False)
-    fig.canvas.draw()
-    return line, fig
-
-
-def update_figure(plot, axes, x, y):
-    new_data = axes.get_ydata()
-    new_data[x] = y
-    axes.set_ydata(new_data)
-    plot.canvas.draw()
-
-
 def reset_batches(batches):
     for batch in batches:
         for block in batch:
@@ -162,7 +137,7 @@ def train_step(retry_num, batches, train_set_size, decay):
     tparams = TrainingParams(LEARN_RATE * (1 - MOMENTUM), 0, 0, 0, 0, 0)
     nparams = initialize()
     reset_batches(batches)
-    plot_axes, plot = new_figure(retry_num)
+    plot_axes, plot = new_figure(retry_num, EPOCH_IN_RETRY)
 
     for train_epoch in range(EPOCH_IN_RETRY):
         tparams = epoch_step(nparams, train_epoch, retry_num, tparams, batches, train_set_size, decay)
@@ -170,8 +145,7 @@ def train_step(retry_num, batches, train_set_size, decay):
             return
         update_figure(plot, plot_axes, train_epoch, tparams.error_to_print)
 
-    plot.savefig('retry{}.png'.format(retry_num))
-    plotter.close(plot)
+    save_to_file(plot, 'retry{}.png'.format(retry_num))
 
 
 def main():
