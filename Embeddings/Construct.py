@@ -1,20 +1,15 @@
 from copy import deepcopy
+
 import numpy as np
 import theano.tensor as T
-from theano import function
 from lasagne.updates import adadelta
-import theano.printing
+from theano import function
 
 from AST.TokenMap import token_map
-from AST.Tokenizer import print_tokens
-from Embeddings.Parameters import Parameters, MARGIN, LEARN_RATE, MOMENTUM
+from Embeddings.Parameters import Parameters, MARGIN
 from TBCNN.Builder import compute_leaf_num
 from TBCNN.Connection import Connection
 from TBCNN.Layer import Layer
-from Utils.Printer import print_layers
-from Utils.Wrappers import timing
-
-# debug_file = open('debuf_file.txt', 'w')
 
 
 def compute_rates(tokens):
@@ -93,7 +88,7 @@ def construct(tokens, params: Parameters, root_token_index, just_validation=Fals
     used_embeddings = {}
     positive_target, positive_layers = build_net(work_tokens, params, root_token_index, used_embeddings)
     change_index = np.random.randint(root_token_index + 1, len(tokens))
-    # random_change(work_tokens, root_token_index)
+
     secret_param = T.fvector('secret')
     negative_target, negative_layers = build_net(work_tokens, params, root_token_index, used_embeddings, change_index,
                                                  secret_param)
@@ -105,10 +100,6 @@ def construct(tokens, params: Parameters, root_token_index, just_validation=Fals
                     f_builder(c.from_layer)
                     c.build_forward()
             layer.build_forward()
-
-    # def forward_propagation(network_layers: list):
-    #     f_builder(network_layers[root_token_index])
-    #     return function([], network_layers[root_token_index].forward)
 
     # @timing
     def back_propagation(pos_forward, neg_forward):
@@ -124,64 +115,15 @@ def construct(tokens, params: Parameters, root_token_index, just_validation=Fals
         pos_d = T.std(pos_delta) * 0.5
         neg_d = T.std(neg_delta) * 0.5
 
-        p_len = T.std(pos_forward)
-        n_len = T.std(neg_forward)
+        # p_len = T.std(pos_forward)
+        # n_len = T.std(neg_forward)
 
         error = T.nnet.relu(MARGIN + pos_d - neg_d)
-        # error = pos_d
-        # print("positive target ", pos_target)
-        # print(pos_target.eval())
-        # print("positive forward")
-        # print(pos_forward.eval())
-        # print("positive distance ", pos_d.eval())
-        # print("positive forward length ", p_len.eval())
-        # print("negative target ", neg_target)
-        # print(neg_target.eval())
-        # print("negative forward")
-        # print(neg_forward.eval())
-        # print("negative distance ", neg_d.eval())
-        # print("negative forward length ", n_len.eval())
-        # print("error ", error.eval())
-        # print("----------------------------------")
+
         if not just_validation:
-
-            # def prepare_updates(variables: dict, updates: dict):
-            #     for key, value in variables.items():
-            #         upd = alpha * T.grad(error, value) + decay * alpha * value
-            #         updates[key] = (upd if key not in updates else updates[key] + upd)
-            #
-            # def build_updates(variables: dict, updates_values: dict, updates: list):
-            #     for key, value in variables.items():
-            #         updates.append((value, value - updates_values[key]))
-            #
-            # updates_values = {}
-            # prepare_updates(params.w, updates_values)
-            # prepare_updates(used_embeddings, updates_values)
-
             update_params = list(params.w.values()) + list(used_embeddings.values())
 
-            # for upd in updates_values.items():
-            #     print(upd[0])
-            #     print(upd[1].eval({alpha: LEARN_RATE * (1 - MOMENTUM)}))
-
-            # pos_index = targets['positive']
-            # neg_index = targets['negative']
-
-            # updates_values[pos_index] = (
-            #     pos_delta)  # if pos_index not in updates_values else updates_values[pos_index] + pos_delta)
-            # updates_values[neg_index] = (
-            #     neg_delta)  # if neg_index not in updates_values else updates_values[neg_index] + neg_delta)
-
-            # updates = []
-            # used_embeddings[pos_index] = pos_target
-            # used_embeddings[neg_index] = neg_target
-            # build_updates(params.w, updates_values, updates)
-            # build_updates(used_embeddings, updates_values, updates)
             updates = adadelta(error, update_params)
-            # for upd in updates:
-            #     print(upd[0])
-            #     print(upd[1].eval({alpha: 0.003, decay: 5e-5}))
-            #     theano.printing.debugprint(upd, file=debug_file)
 
             return function([secret_param, alpha, decay], outputs=error, updates=updates, on_unused_input='ignore')
         else:
@@ -191,15 +133,8 @@ def construct(tokens, params: Parameters, root_token_index, just_validation=Fals
     f_builder(negative_layers[root_token_index])
 
     pos_forward = positive_layers[root_token_index].forward
-
-    # theano.printing.pydotprint(pos_forward, 'nn_graph.png')
-    # print_tokens(tokens)
-    # raise Exception
     neg_forward = negative_layers[root_token_index].forward
 
     back_prop = back_propagation(pos_forward, neg_forward)
-
-    # theano.printing.pydotprint(back_prop, 'nn_back_prop.png')
-    # raise Exception
 
     return back_prop
