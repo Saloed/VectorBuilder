@@ -9,6 +9,7 @@ from Embeddings.Parameters import *
 from Utils.Visualization import new_figure, update_figure, save_to_file
 from Utils.Wrappers import *
 from collections import namedtuple
+import gc
 
 theano.config.floatX = 'float32'
 theano.config.mode = 'FAST_COMPILE'
@@ -114,7 +115,7 @@ def epoch_step(params, epoch_num, retry_num, tparams, batches, train_set_size, d
     fprint(print_str, log_file)
     alpha *= 0.999
     if epoch_num % 100 == 0:
-        with open('NewParams/new_params_t' + str(retry_num) + "_ep" + str(epoch_num), mode='wb') as new_params:
+        with open('NewParams/n_new_params_t' + str(retry_num) + "_ep" + str(epoch_num), mode='wb') as new_params:
             c_pickle.dump(params, new_params)
     valid_size = len(validation_set)
     return TrainingParams(alpha, t_error_per_ast, t_error_per_token, v_error_per_ast, v_error_per_token,
@@ -130,6 +131,7 @@ def reset_batches(batches):
         for block in batch:
             block.back_prop = None
             block.validation = None
+    gc.collect()
 
 
 @safe_run
@@ -145,7 +147,7 @@ def train_step(retry_num, batches, train_set_size, decay):
             return
         update_figure(plot, plot_axes, train_epoch, tparams.error_to_print)
 
-    save_to_file(plot, 'retry{}.png'.format(retry_num))
+    save_to_file(plot, 'n_retry{}.png'.format(retry_num))
 
 
 def main():
@@ -162,5 +164,6 @@ def main():
 
 
 if __name__ == '__main__':
+    gc.enable()
     main()
     # build_asts('../Dataset/')

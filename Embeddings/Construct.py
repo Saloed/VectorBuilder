@@ -2,11 +2,11 @@ from copy import deepcopy
 
 import numpy as np
 import theano.tensor as T
-from lasagne.updates import adadelta
+from lasagne.updates import adadelta, nesterov_momentum
 from theano import function
 
 from AST.TokenMap import token_map
-from Embeddings.Parameters import Parameters, MARGIN
+from Embeddings.Parameters import Parameters, MARGIN, LEARN_RATE
 from TBCNN.Builder import compute_leaf_num
 from TBCNN.Connection import Connection
 from TBCNN.Layer import Layer
@@ -123,7 +123,7 @@ def construct(tokens, params: Parameters, root_token_index, just_validation=Fals
         if not just_validation:
             update_params = list(params.w.values()) + list(used_embeddings.values())
 
-            updates = adadelta(error, update_params)
+            updates = nesterov_momentum(error, update_params, LEARN_RATE)
 
             return function([secret_param, alpha, decay], outputs=error, updates=updates, on_unused_input='ignore')
         else:

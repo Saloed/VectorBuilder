@@ -26,7 +26,6 @@ def compute_leaf_num(root, nodes, depth=0):
 
 def construct_from_ast(ast, parameters: Params, need_back_prop=False):
     nodes = ast_to_list(ast)
-
     for i in range(len(nodes)):
         if nodes[i].parent is not None:
             nodes[nodes[i].parent].children.append(i)
@@ -46,45 +45,52 @@ def construct_from_ast(ast, parameters: Params, need_back_prop=False):
     avg_depth *= .6
     if avg_depth < 1:        avg_depth = 1
 
-    return construct_network(nodes, parameters, need_back_prop, avg_depth)
-
-
-def construct_network(nodes, parameters: Params, need_back_prop: bool, pool_cutoff):
-    nodes_amount = len(nodes)
-    layers = [Layer] * nodes_amount
-    leaf_amount = 0
-    for i, node in enumerate(nodes):
+    leafs = []
+    non_leafs = []
+    for node in nodes:
         if len(node.children) == 0:
-            leaf_amount += 1
-        # print(node.token_type)
-        layers[i] = Layer(parameters.embeddings[node.token_index], "embedding_" + str(i))
-    not_leaf_amount = nodes_amount - leaf_amount
-    layers.extend([Layer] * (2 * not_leaf_amount))
-    for i in range(leaf_amount, nodes_amount):
-        layers[i + not_leaf_amount] = layers[i]
-        layers[i] = Layer(parameters.b['b_construct'], "autoencoder_" + str(i - leaf_amount))
+            leafs.append(node)
+        else:
+            non_leafs.append(node)
+    return construct_network(Nodes(nodes, leafs, non_leafs), parameters, need_back_prop, avg_depth)
+
+
+Nodes = namedtuple('Nodes', ['all_nodes', 'leafs', 'non_leafs'])
+
+
+def build_net(nodes: Nodes, params: Params, pool_cutoff):
+    used_embeddings = {}
+    nodes_amount = len(nodes)
+
+    emb_layers = [Layer] * nodes_amount
+
+    for i, node in enumerate(nodes.all_nodes):
+        emb = params.embeddings[node.token_index]
+        used_embeddings[node.token_index] = emb
+        emb_layers[i] = Layer(emb, "embedding_" + str(i))
+
+    ae_layers = [Layer] * len(nodes.non_leafs)
+    cmb_layers = [Layer] * len(nodes.non_leafs)
+
+    for i, node in enumerate(nodes.non_leafs):
+        emb_layer = emb_layers[node.pos]
+        ae_layers[i] = ae_layer = Layer(params.b['b_construct'], "autoencoder_" + str(i))
+        cmb_layers[i] = cmb_layer = Layer(None, "combination_" + str(i))
+        Connection(ae_layer, cmb_layer, params.w['w_comb_ae'])
+        Connection(emb_layer, cmb_layer, params.w['w_comb_emb'])
+        for child in node.children:
+            if child.left_rate != 0:
+                Connection(emb_layers[child.pos], ae_layer, params.w['w_left'],
+                           w_coeff=child.left_rate * child.leaf_num / node.leaf_num)
+            if child.right_rate != 0:
+                Connection(emb_layers[child.pos], ae_layer, params.w['w_right'],
+                           w_coeff=child.right_rate * child.leaf_num / node.leaf_num)
 
     for i in range(nodes_amount):
         node = nodes[i]
         if node.parent is None: continue
-        from_layer = layers[i]
-        to_layer = layers[node.parent]
-        if node.left_rate != 0:
-            Connection(from_layer, to_layer, parameters.w['w_left'],
-                       w_coeff=node.left_rate * node.leaf_num / nodes[node.parent].leaf_num)
-        if node.right_rate != 0:
-            Connection(from_layer, to_layer, parameters.w['w_right'],
-                       w_coeff=node.right_rate * node.leaf_num / nodes[node.parent].leaf_num)
-
-    for i in range(leaf_amount, nodes_amount):
-        ae_layer = layers[i]
-        emb_layer = layers[i + not_leaf_amount]
-        layers[i + not_leaf_amount * 2] = ae_layer
-        layers[i] = cmb_layer = Layer(None, "combination_" + str(i - leaf_amount))
-        Connection(ae_layer, cmb_layer, parameters.w['w_comb_ae'])
-        Connection(emb_layer, cmb_layer, parameters.w['w_comb_emb'])
-
-    if DONT_MAKE_CONV: return layers
+        from_layer = emb_layers[i]
+        to_layer = emb_layers[node.parent]
 
     pool_top = PoolLayer('pool_top', NUM_CONVOLUTION)
     pool_left = PoolLayer('pool_left', NUM_CONVOLUTION)
@@ -101,10 +107,10 @@ def construct_network(nodes, parameters: Params, need_back_prop: bool, pool_cuto
             cur_layer = layers[i]
             cur_node = nodes[i]
 
-            conv_layer = Layer(parameters.b['b_conv'], "convolve_" + str(i), NUM_CONVOLUTION)
+            conv_layer = Layer(params.b['b_conv'], "convolve_" + str(i), NUM_CONVOLUTION)
             layers.append(conv_layer)
 
-            Connection(cur_layer, conv_layer, parameters.w['w_conv_root'])
+            Connection(cur_layer, conv_layer, params.w['w_conv_root'])
 
             child_num = len(cur_node.children)
 
@@ -140,9 +146,9 @@ def construct_network(nodes, parameters: Params, need_back_prop: bool, pool_cuto
                     right_w = child_node.pos / (child_num - 1.0)
                     left_w = 1 - right_w
                 if left_w != 0:
-                    Connection(child_layer, conv_layer, parameters.w['w_conv_left'], left_w)
+                    Connection(child_layer, conv_layer, params.w['w_conv_left'], left_w)
                 if right_w != 0:
-                    Connection(child_layer, conv_layer, parameters.w['w_conv_right'], right_w)
+                    Connection(child_layer, conv_layer, params.w['w_conv_right'], right_w)
 
             queue = next_queue
 
@@ -155,19 +161,19 @@ def construct_network(nodes, parameters: Params, need_back_prop: bool, pool_cuto
         layers[i] = layers[pos]
         layers[pos] = tmp
 
-    dis_layer = Layer(parameters.b['b_dis'], 'discriminative', NUM_DISCRIMINATIVE)
+    dis_layer = Layer(params.b['b_dis'], 'discriminative', NUM_DISCRIMINATIVE)
 
     def softmax(z):
         e_z = T.exp(z - z.max(axis=0, keepdims=True))
         return e_z / e_z.sum(axis=0, keepdims=True)
 
-    out_layer = Layer(parameters.b['b_out'], "softmax", NUM_OUT_LAYER, softmax)
+    out_layer = Layer(params.b['b_out'], "softmax", NUM_OUT_LAYER, softmax)
 
-    Connection(pool_top, dis_layer, parameters.w['w_dis_top'])
-    Connection(pool_left, dis_layer, parameters.w['w_dis_left'])
-    Connection(pool_right, dis_layer, parameters.w['w_dis_right'])
+    Connection(pool_top, dis_layer, params.w['w_dis_top'])
+    Connection(pool_left, dis_layer, params.w['w_dis_left'])
+    Connection(pool_right, dis_layer, params.w['w_dis_right'])
 
-    Connection(dis_layer, out_layer, parameters.w['w_out'])
+    Connection(dis_layer, out_layer, params.w['w_out'])
 
     layers.append(pool_top)
     layers.append(pool_left)
@@ -175,6 +181,11 @@ def construct_network(nodes, parameters: Params, need_back_prop: bool, pool_cuto
 
     layers.append(dis_layer)
     layers.append(out_layer)
+    return layers
+
+
+def construct_network(nodes: Nodes, parameters: Params, need_back_prop: bool, pool_cutoff):
+    net = build_net(nodes, parameters, pool_cutoff)
 
     def f_builder(layer):
         if not layer.f_initialized:
@@ -184,45 +195,12 @@ def construct_network(nodes, parameters: Params, need_back_prop: bool, pool_cuto
                     c.build_forward()
             layer.build_forward()
 
-    def b_builder(layer, update: Updates):
-        if not layer.b_initialized:
-            for c in layer.out_connection:
-                if not c.b_initialized:
-                    b_builder(c.to_layer, update)
-                    c.build_back(update)
-            layer.build_back(update)
+    def back_propagation(net_forward):
+        if not need_back_prop:
+            return None, None
+        pass
 
-    def forward_propagation(network: list):
-        last_layer = network[-1]
-        return function([], last_layer.forward)
-
-    def back_propagation(updates: Updates):
-        update = []
-        diff = []
-
-        def make_update(target, upd):
-            diff.append(upd)
-            tpl = (target, target + upd)
-            return tpl
-
-        for (bias, upd) in updates.bias_updates.items():
-            update.append(make_update(bias, upd))
-
-        for (weights, upd) in updates.weights_updates.items():
-            update.append(make_update(weights, upd))
-
-        return function([updates.error], updates=update)
-
-    network = Network(layers)
-
-    for lay in layers:
-        f_builder(lay)
-    network.forward = forward_propagation(layers)
-
-    if need_back_prop:
-        update = Updates()
-        for lay in reversed(layers):
-            b_builder(lay, update)
-        network.back = back_propagation(update)
-
-    return network
+    f_builder(net[-1])
+    net_forward = net[-1].forward
+    net_back, net_validation = back_propagation(net_forward)
+    return Network(net_forward, net_back, net_validation)

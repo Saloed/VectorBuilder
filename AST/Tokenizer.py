@@ -94,3 +94,4 @@ def reorder(nodes):
     for node in nodes:
         if node.parent is not None:
             node.parent = length - node.parent
+

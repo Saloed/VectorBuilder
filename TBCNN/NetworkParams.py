@@ -1,3 +1,5 @@
+from collections import namedtuple
+
 import theano.tensor
 import numpy as np
 
@@ -60,11 +62,7 @@ class Updates:
             self.grad_b['emb_' + token] = zeros(NUM_FEATURES)
 
 
-class Network:
-    def __init__(self):
-        # self.layers = layers
-        self.forward = None
-        self.back = None
+Network = namedtuple('Network', ['forward', 'back', 'validation'])
 
 
 class Params:
