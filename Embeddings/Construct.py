@@ -2,6 +2,7 @@ from copy import deepcopy
 import numpy as np
 import theano.tensor as T
 from theano import function
+from lasagne.updates import adadelta
 import theano.printing
 
 from AST.TokenMap import token_map
@@ -145,18 +146,20 @@ def construct(tokens, params: Parameters, root_token_index, just_validation=Fals
         # print("----------------------------------")
         if not just_validation:
 
-            def prepare_updates(variables: dict, updates: dict):
-                for key, value in variables.items():
-                    upd = alpha * T.grad(error, value) + decay * alpha * value
-                    updates[key] = (upd if key not in updates else updates[key] + upd)
+            # def prepare_updates(variables: dict, updates: dict):
+            #     for key, value in variables.items():
+            #         upd = alpha * T.grad(error, value) + decay * alpha * value
+            #         updates[key] = (upd if key not in updates else updates[key] + upd)
+            #
+            # def build_updates(variables: dict, updates_values: dict, updates: list):
+            #     for key, value in variables.items():
+            #         updates.append((value, value - updates_values[key]))
+            #
+            # updates_values = {}
+            # prepare_updates(params.w, updates_values)
+            # prepare_updates(used_embeddings, updates_values)
 
-            def build_updates(variables: dict, updates_values: dict, updates: list):
-                for key, value in variables.items():
-                    updates.append((value, value - updates_values[key]))
-
-            updates_values = {}
-            prepare_updates(params.w, updates_values)
-            prepare_updates(used_embeddings, updates_values)
+            update_params = list(params.w.values()) + list(used_embeddings.values())
 
             # for upd in updates_values.items():
             #     print(upd[0])
@@ -170,12 +173,12 @@ def construct(tokens, params: Parameters, root_token_index, just_validation=Fals
             # updates_values[neg_index] = (
             #     neg_delta)  # if neg_index not in updates_values else updates_values[neg_index] + neg_delta)
 
-            updates = []
+            # updates = []
             # used_embeddings[pos_index] = pos_target
             # used_embeddings[neg_index] = neg_target
-            build_updates(params.w, updates_values, updates)
-            build_updates(used_embeddings, updates_values, updates)
-
+            # build_updates(params.w, updates_values, updates)
+            # build_updates(used_embeddings, updates_values, updates)
+            updates = adadelta(error, update_params)
             # for upd in updates:
             #     print(upd[0])
             #     print(upd[1].eval({alpha: 0.003, decay: 5e-5}))

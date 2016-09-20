@@ -1,6 +1,7 @@
 import _pickle as c_pickle
 from matplotlib import pyplot as plt
 from scipy.cluster.hierarchy import dendrogram, linkage
+from scipy.cluster.vq import kmeans, vq
 import numpy as np
 
 
@@ -28,6 +29,19 @@ def clustering(file_with_params):
     )
     fig.show()
     fig.savefig('claster.png')
+    size = len(names)
+    num_clasters = 10
+    centroids, _ = kmeans(X, num_clasters)
+    idx, _ = vq(X, centroids)
+    result = {}
+    for i in range(size):
+        cl = idx[i]
+        if cl not in result:
+            result[cl] = []
+        result[cl].append(names[i])
+    for i in range(num_clasters):
+        print('claster {0}'.format(i))
+        print(result[i])
 
 
 if __name__ == '__main__':
