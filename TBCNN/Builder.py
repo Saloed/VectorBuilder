@@ -3,7 +3,7 @@ from theano import function
 
 from AST.Tokenizer import ast_to_list
 from TBCNN.Connection import Connection, PoolConnection
-from TBCNN.Layer import Layer, PoolLayer
+from TBCNN.Layer import Layer, Poolling
 from TBCNN.NetworkParams import *
 
 
@@ -86,9 +86,9 @@ def construct_network(nodes, parameters: Params, need_back_prop: bool, pool_cuto
 
     if DONT_MAKE_CONV: return layers
 
-    pool_top = PoolLayer('pool_top', NUM_CONVOLUTION)
-    pool_left = PoolLayer('pool_left', NUM_CONVOLUTION)
-    pool_right = PoolLayer('pool_right', NUM_CONVOLUTION)
+    pool_top = Poolling('pool_top', NUM_CONVOLUTION)
+    pool_left = Poolling('pool_left', NUM_CONVOLUTION)
+    pool_right = Poolling('pool_right', NUM_CONVOLUTION)
 
     queue = [(nodes_amount - 1, None)]
     layer_cnt = 0
