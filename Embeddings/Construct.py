@@ -62,7 +62,7 @@ def build_net(tokens, params: Parameters, root_token_index, used_embeddings, cha
         else:
             emb = params.embeddings[node.token_index]
             used_embeddings[node.token_index] = emb
-            layers[i] = Layer(emb, "embedding_" + str(i))
+            layers[i] = Embedding(emb, "embedding_" + str(i))
 
     for i in range(nodes_amount):
         node = tokens[i]
