@@ -9,7 +9,7 @@ from AST.TokenMap import token_map
 from Embeddings.Parameters import Parameters, MARGIN, LEARN_RATE
 from TBCNN.Builder import compute_leaf_num
 from TBCNN.Connection import Connection
-from TBCNN.Layer import Layer
+from TBCNN.Layer import *
 
 
 def compute_rates(tokens):
@@ -43,14 +43,14 @@ def random_change(tokens, root_token_index):
 def build_net(tokens, params: Parameters, root_token_index, used_embeddings, change_index=-1, secret_param=None):
     nodes_amount = len(tokens)
     # layer index equal token index
-    layers = [None] * nodes_amount
+    layers = [Layer] * nodes_amount
 
     assert root_token_index == 0
 
     root_token = tokens[root_token_index]
     positive_target = params.embeddings[root_token.token_index]
     used_embeddings[root_token.token_index] = positive_target
-    root_layer = Layer(params.b_construct, "root_layer")
+    root_layer = Encoder(params.b_construct, "root_layer")
     layers[root_token_index] = root_layer
     used_embeddings['b_construct'] = params.b_construct
 
@@ -58,7 +58,7 @@ def build_net(tokens, params: Parameters, root_token_index, used_embeddings, cha
         if i == root_token_index:
             continue
         if i == change_index:
-            layers[i] = Layer(secret_param, "embedding_" + secret_param.name)
+            layers[i] = Embedding(secret_param, "embedding_" + secret_param.name)
         else:
             emb = params.embeddings[node.token_index]
             used_embeddings[node.token_index] = emb
