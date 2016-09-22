@@ -30,7 +30,7 @@ def clustering(file_with_params):
     fig.show()
     fig.savefig('claster.png')
     size = len(names)
-    num_clasters = 10
+    num_clasters = 40
     centroids, _ = kmeans(X, num_clasters)
     idx, _ = vq(X, centroids)
     result = {}
@@ -39,10 +39,10 @@ def clustering(file_with_params):
         if cl not in result:
             result[cl] = []
         result[cl].append(names[i])
-    for i in range(num_clasters):
+    for i in result.keys():
         print('claster {0}'.format(i))
         print(result[i])
 
 
 if __name__ == '__main__':
-    clustering('best_params')
+    clustering('ada_best_params')

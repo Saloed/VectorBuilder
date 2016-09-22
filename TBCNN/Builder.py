@@ -86,15 +86,11 @@ def build_net(nodes: Nodes, params: Params, pool_cutoff):
                 Connection(emb_layers[child.pos], ae_layer, params.w['w_right'],
                            w_coeff=child.right_rate * child.leaf_num / node.leaf_num)
 
-    for i in range(nodes_amount):
-        node = nodes[i]
-        if node.parent is None: continue
-        from_layer = emb_layers[i]
-        to_layer = emb_layers[node.parent]
-
     pool_top = PoolLayer('pool_top', NUM_CONVOLUTION)
     pool_left = PoolLayer('pool_left', NUM_CONVOLUTION)
     pool_right = PoolLayer('pool_right', NUM_CONVOLUTION)
+
+    conv_layers = []
 
     queue = [(nodes_amount - 1, None)]
     layer_cnt = 0

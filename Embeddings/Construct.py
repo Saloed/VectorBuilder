@@ -2,7 +2,7 @@ from copy import deepcopy
 
 import numpy as np
 import theano.tensor as T
-from lasagne.updates import adadelta, nesterov_momentum
+from lasagne.updates import adadelta, nesterov_momentum, adam
 from theano import function
 
 from AST.TokenMap import token_map
@@ -123,7 +123,7 @@ def construct(tokens, params: Parameters, root_token_index, just_validation=Fals
         if not just_validation:
             update_params = list(params.w.values()) + list(used_embeddings.values())
 
-            updates = nesterov_momentum(error, update_params, LEARN_RATE)
+            updates = adam(error, update_params)
 
             return function([secret_param, alpha, decay], outputs=error, updates=updates, on_unused_input='ignore')
         else:

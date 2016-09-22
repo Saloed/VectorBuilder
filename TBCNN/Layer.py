@@ -5,7 +5,6 @@ from theano.compile import SharedVariable as TS
 
 from TBCNN.NetworkParams import NUM_FEATURES
 
-
 class Layer:
     def __init__(self, bias: TS, name="", feature_amount=NUM_FEATURES,
                  activation=T.tanh,
@@ -33,6 +32,17 @@ class Layer:
         else:
             y = T.max(connections, axis=0)
         self.forward = y
+
+
+class EmbeddingLayer:
+    def __init__(self):
+        pass
+
+
+class CombinationLayer:
+    def __init__(self):
+        pass
+
 
 
 class PoolLayer(Layer):
