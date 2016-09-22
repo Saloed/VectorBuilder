@@ -103,8 +103,8 @@ def build_net(nodes: Nodes, params: Params, pool_cutoff):
             cur_layer = layers[i]
             cur_node = nodes[i]
 
-            conv_layer = Layer(params.b['b_conv'], "convolve_" + str(i), NUM_CONVOLUTION)
-            layers.append(conv_layer)
+            conv_layer = Convolution(params.b['b_conv'], "convolve_" + str(i))
+            conv_layers.append(conv_layer)
 
             Connection(cur_layer, conv_layer, params.w['w_conv_root'])
 
