@@ -68,9 +68,9 @@ class Convolution(Layer):
         self.forward = self.activation(T.add(z, self.bias))
 
 
-class Discriminative(Layer):
+class FullConnected(Layer):
     def __init__(self, bias: TS,
-                 activation, name="dis", feature_amount=NUM_DISCRIMINATIVE):
+                 activation, name="fc", feature_amount=NUM_DISCRIMINATIVE):
         super().__init__(name, feature_amount)
         self.bias = bias
         self.activation = activation
@@ -81,8 +81,8 @@ class Discriminative(Layer):
         self.forward = self.activation(T.add(z, self.bias))
 
 
-class Poolling(Layer):
-    def __init__(self, name, feature_amount=NUM_POOLING):
+class Pooling(Layer):
+    def __init__(self, name, feature_amount=NUM_CONVOLUTION):
         super().__init__(name, feature_amount)
 
     def build_forward(self):

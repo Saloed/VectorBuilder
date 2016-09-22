@@ -3,7 +3,7 @@ from theano import function
 
 from AST.Tokenizer import ast_to_list
 from TBCNN.Connection import Connection, PoolConnection
-from TBCNN.Layer import Layer, Poolling
+from TBCNN.Layer import *
 from TBCNN.NetworkParams import *
 
 
@@ -67,15 +67,15 @@ def build_net(nodes: Nodes, params: Params, pool_cutoff):
     for i, node in enumerate(nodes.all_nodes):
         emb = params.embeddings[node.token_index]
         used_embeddings[node.token_index] = emb
-        emb_layers[i] = Layer(emb, "embedding_" + str(i))
+        emb_layers[i] = Embedding(emb, "embedding_" + str(i))
 
     ae_layers = [Layer] * len(nodes.non_leafs)
     cmb_layers = [Layer] * len(nodes.non_leafs)
 
     for i, node in enumerate(nodes.non_leafs):
         emb_layer = emb_layers[node.pos]
-        ae_layers[i] = ae_layer = Layer(params.b['b_construct'], "autoencoder_" + str(i))
-        cmb_layers[i] = cmb_layer = Layer(None, "combination_" + str(i))
+        ae_layers[i] = ae_layer = Encoder(params.b['b_construct'], "autoencoder_" + str(i))
+        cmb_layers[i] = cmb_layer = Combination("combination_" + str(i))
         Connection(ae_layer, cmb_layer, params.w['w_comb_ae'])
         Connection(emb_layer, cmb_layer, params.w['w_comb_emb'])
         for child in node.children:
@@ -86,9 +86,9 @@ def build_net(nodes: Nodes, params: Params, pool_cutoff):
                 Connection(emb_layers[child.pos], ae_layer, params.w['w_right'],
                            w_coeff=child.right_rate * child.leaf_num / node.leaf_num)
 
-    pool_top = Poolling('pool_top', NUM_CONVOLUTION)
-    pool_left = Poolling('pool_left', NUM_CONVOLUTION)
-    pool_right = Poolling('pool_right', NUM_CONVOLUTION)
+    pool_top = Pooling('pool_top', NUM_CONVOLUTION)
+    pool_left = Pooling('pool_left', NUM_CONVOLUTION)
+    pool_right = Pooling('pool_right', NUM_CONVOLUTION)
 
     conv_layers = []
 
@@ -151,25 +151,23 @@ def build_net(nodes: Nodes, params: Params, pool_cutoff):
         layer_cnt += 1
         cur_len = len(queue)
 
-    for i in range(leaf_amount, leaf_amount + not_leaf_amount):
-        pos = i + 2 * not_leaf_amount
-        tmp = layers[i]
-        layers[i] = layers[pos]
-        layers[pos] = tmp
-
-    dis_layer = Layer(params.b['b_dis'], 'discriminative', NUM_DISCRIMINATIVE)
+    dis_layer = FullConnected(params.b['b_dis'], activation=T.tanh,
+                              name='discriminative', feature_amount=NUM_DISCRIMINATIVE)
 
     def softmax(z):
         e_z = T.exp(z - z.max(axis=0, keepdims=True))
         return e_z / e_z.sum(axis=0, keepdims=True)
 
-    out_layer = Layer(params.b['b_out'], "softmax", NUM_OUT_LAYER, softmax)
+    out_layer = FullConnected(params.b['b_out'], activation=softmax,
+                              name="softmax", feature_amount=NUM_OUT_LAYER)
 
     Connection(pool_top, dis_layer, params.w['w_dis_top'])
     Connection(pool_left, dis_layer, params.w['w_dis_left'])
     Connection(pool_right, dis_layer, params.w['w_dis_right'])
 
     Connection(dis_layer, out_layer, params.w['w_out'])
+
+    layers = emb_layers + ae_layers + cmb_layers + conv_layers
 
     layers.append(pool_top)
     layers.append(pool_left)
