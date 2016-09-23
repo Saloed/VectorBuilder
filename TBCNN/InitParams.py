@@ -38,7 +38,7 @@ def rand_bias(shape, name):
 
 
 def rand_params():
-    with open('emb_params', 'rb') as p_file:
+    with open('TBCNN/emb_params', 'rb') as p_file:
         e_params = P.load(p_file)
 
     embeddings = e_params.embeddings
