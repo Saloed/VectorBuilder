@@ -25,21 +25,21 @@ def compute_leaf_num(root, nodes, depth=0):
 
 
 def construct_from_ast(ast, parameters: Params, need_back_prop=False):
-    nodes = ast_to_list(ast)
-    for i in range(len(nodes)):
-        if nodes[i].parent is not None:
-            nodes[nodes[i].parent].children.append(i)
+    nodes = ast
+    # for i in range(len(nodes)):
+    #     if nodes[i].parent is not None:
+    #         nodes[nodes[i].parent].children.append(i)
     for i in range(len(nodes)):
         node = nodes[i]
         len_children = len(node.children)
         if len_children >= 0:
             for child in node.children:
                 if len_children == 1:
-                    nodes[child].left_rate = .5
-                    nodes[child].right_rate = .5
+                    child.left_rate = .5
+                    child.right_rate = .5
                 else:
-                    nodes[child].right_rate = nodes[child].pos / (len_children - 1.0)
-                    nodes[child].left_rate = 1.0 - nodes[child].right_rate
+                    child.right_rate = child.pos / (len_children - 1.0)
+                    child.left_rate = 1.0 - child.right_rate
 
     _, _, avg_depth = compute_leaf_num(nodes[-1], nodes)
     avg_depth *= .6
@@ -60,14 +60,16 @@ Nodes = namedtuple('Nodes', ['all_nodes', 'leafs', 'non_leafs'])
 
 def build_net(nodes: Nodes, params: Params, pool_cutoff):
     used_embeddings = {}
-    nodes_amount = len(nodes)
+    nodes_amount = len(nodes.all_nodes)
 
     emb_layers = [Layer] * nodes_amount
+    _layers = {}
 
     for i, node in enumerate(nodes.all_nodes):
         emb = params.embeddings[node.token_index]
         used_embeddings[node.token_index] = emb
-        emb_layers[i] = Embedding(emb, "embedding_" + str(i))
+        emb_layers[i] = emb_layer = Embedding(emb, "embedding_" + str(i))
+        _layers[node] = emb_layer
 
     ae_layers = [Layer] * len(nodes.non_leafs)
     cmb_layers = [Layer] * len(nodes.non_leafs)
@@ -76,6 +78,7 @@ def build_net(nodes: Nodes, params: Params, pool_cutoff):
         emb_layer = emb_layers[node.pos]
         ae_layers[i] = ae_layer = Encoder(params.b['b_construct'], "autoencoder_" + str(i))
         cmb_layers[i] = cmb_layer = Combination("combination_" + str(i))
+        _layers[node] = cmb_layer
         Connection(ae_layer, cmb_layer, params.w['w_comb_ae'])
         Connection(emb_layer, cmb_layer, params.w['w_comb_emb'])
         for child in node.children:

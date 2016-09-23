@@ -1,3 +1,4 @@
+# todo full rebase on dict (remove pos)
 class Token:
     token_type = None
     token_index = None
@@ -15,3 +16,11 @@ class Token:
         self.parent = parent
         self.children = []
         self.pos = pos
+        self._hash = pos
+
+    # redefined for use in dict
+    def __hash__(self):
+        return self._hash
+
+    def __str__(self):
+        return str(self.token_type) + str(self._hash)

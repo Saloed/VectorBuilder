@@ -68,7 +68,7 @@ def tokenize(root, parent, parent_id, pos, nodes, leafs):
     if isinstance(root, Node):
         token_type = root.__repr__()
         token = Token(token_type, token_map[token_type],
-                      parent_id, pos)
+                      parent, pos)
         if parent is not None:
             parent.children.append(token)
         children = root.children
@@ -90,8 +90,5 @@ def tokenize(root, parent, parent_id, pos, nodes, leafs):
 
 def reorder(nodes):
     nodes.reverse()
-    length = len(nodes)
-    for node in nodes:
-        if node.parent is not None:
-            node.parent = length - node.parent
-
+    for i, node in enumerate(nodes):
+        node._hash = i

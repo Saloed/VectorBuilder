@@ -123,7 +123,7 @@ def construct(tokens, params: Parameters, root_token_index, just_validation=Fals
         if not just_validation:
             update_params = list(params.w.values()) + list(used_embeddings.values())
 
-            updates = adam(error, update_params)
+            updates = adadelta(error, update_params)
 
             return function([secret_param, alpha, decay], outputs=error, updates=updates, on_unused_input='ignore')
         else:
