@@ -56,9 +56,11 @@ ConvolveParams = namedtuple('ConvolveParams',
 
 
 def convolve_creator(root_node, node_info: NodeInfo, conv_layers, depth, cp: ConvolveParams):
+    child_len = len(root_node.children)
+    if child_len == 0: return
     conv_layer = Convolution(cp.params.b['b_conv'], "convolve_" + str(root_node))
     conv_layers.append(conv_layer)
-    root_layer = cp.layers[root_node]
+    root_layer = cp.layers[root_node.index]
     Connection(root_layer, conv_layer, cp.params.w['w_conv_root'])
     if depth < cp.pool_cutoff:
         PoolConnection(conv_layer, cp.pool_top)
@@ -68,7 +70,6 @@ def convolve_creator(root_node, node_info: NodeInfo, conv_layers, depth, cp: Con
         if node_info == NodeInfo.right:
             PoolConnection(conv_layer, cp.pool_right)
 
-    child_len = len(root_node.children)
     for child in root_node.children:
         if child_len == 1:
             left_w = .5
@@ -77,7 +78,7 @@ def convolve_creator(root_node, node_info: NodeInfo, conv_layers, depth, cp: Con
             right_w = child.pos / (child_len - 1.0)
             left_w = 1.0 - right_w
 
-        child_layer = cp.layers[child]
+        child_layer = cp.layers[child.index]
         if left_w != 0:
             Connection(child_layer, conv_layer, cp.params.w['w_conv_left'], left_w)
         if right_w != 0:
@@ -100,26 +101,26 @@ def build_net(nodes: Nodes, params: Params, pool_cutoff):
     used_embeddings = {}
     nodes_amount = len(nodes.all_nodes)
 
-    _layers = {}
+    _layers = [Layer] * nodes_amount
 
     for node in nodes.all_nodes:
         emb = params.embeddings[node.token_index]
         used_embeddings[node.token_index] = emb
-        _layers[node] = Embedding(emb, "embedding_" + str(node))
+        _layers[node.index] = Embedding(emb, "embedding_" + str(node))
 
     for node in nodes.non_leafs:
-        emb_layer = _layers[node]
+        emb_layer = _layers[node.index]
         ae_layer = Encoder(params.b['b_construct'], "autoencoder_" + str(node))
         cmb_layer = Combination("combination_" + str(node))
         Connection(ae_layer, cmb_layer, params.w['w_comb_ae'])
         Connection(emb_layer, cmb_layer, params.w['w_comb_emb'])
-        _layers[node] = cmb_layer
+        _layers[node.index] = cmb_layer
         for child in node.children:
             if child.left_rate != 0:
-                Connection(_layers[child], ae_layer, params.w['w_left'],
+                Connection(_layers[child.index], ae_layer, params.w['w_left'],
                            w_coeff=child.left_rate * child.leaf_num / node.leaf_num)
             if child.right_rate != 0:
-                Connection(_layers[child], ae_layer, params.w['w_right'],
+                Connection(_layers[child.index], ae_layer, params.w['w_right'],
                            w_coeff=child.right_rate * child.leaf_num / node.leaf_num)
 
     pool_top = Pooling('pool_top', NUM_CONVOLUTION)
@@ -147,7 +148,7 @@ def build_net(nodes: Nodes, params: Params, pool_cutoff):
 
     Connection(dis_layer, out_layer, params.w['w_out'])
 
-    layers = list(_layers.values()) + conv_layers
+    layers = _layers + conv_layers
 
     layers.append(pool_top)
     layers.append(pool_left)
@@ -161,10 +162,10 @@ def build_net(nodes: Nodes, params: Params, pool_cutoff):
 def construct_network(nodes: Nodes, parameters: Params, need_back_prop: bool, pool_cutoff):
     net = build_net(nodes, parameters, pool_cutoff)
 
-    def f_builder(layer):
-        if not layer.f_initialized:
+    def f_builder(layer: Layer):
+        if layer.forward is None:
             for c in layer.in_connection:
-                if not c.f_initialized:
+                if c.forward is None:
                     f_builder(c.from_layer)
                     c.build_forward()
             layer.build_forward()

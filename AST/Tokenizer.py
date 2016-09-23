@@ -97,4 +97,4 @@ def tokenize(root, parent, parent_id, pos, nodes):
 def reorder(nodes):
     nodes.reverse()
     for i, node in enumerate(nodes):
-        node._hash = i
+        node.index = i

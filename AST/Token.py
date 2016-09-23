@@ -16,11 +16,7 @@ class Token:
         self.parent = parent
         self.children = []
         self.pos = pos
-        self._hash = pos
-
-    # redefined for use in dict
-    def __hash__(self):
-        return self._hash
+        self.index = None
 
     def __str__(self):
-        return str(self.token_type) + str(self._hash)
+        return str(self.token_type) + str(self.index)
