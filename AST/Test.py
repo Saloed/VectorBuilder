@@ -2,6 +2,7 @@ import time
 from antlr4 import *
 from AST.JANTLR.Java8Lexer import Java8Lexer
 from AST.JANTLR.Java8Parser import Java8Parser
+from antlr4.tree.Trees import Trees
 from Utils.Wrappers import timing
 
 
@@ -11,7 +12,9 @@ def doparsing(filename):
     lexer = Java8Lexer(input)
     stream = CommonTokenStream(lexer)
     parser = Java8Parser(stream)
-    tree = parser.
+    tree = parser.compilationUnit()
+    print(Trees.toStringTree(tree, None, parser))
+    return tree
 
 
 def main():
