@@ -16,7 +16,7 @@ class Node:
         self.children = []
 
     def shifted_string(self, shift="") -> str:
-        string = "\n" + shift + "┗ " + self.node_name
+        string = '\n{}┗ {} [{}:{}]'.format(shift, self.node_name, self.src_start, self.src_end)
         for child in self.children:
             if child.is_terminal:
                 string += " " + child.node_name
@@ -48,24 +48,40 @@ def parse_tree(root, parent=None) -> Node:
     return node
 
 
-# def start_jvm_with_parser():
-#     sp = subprocess.call(["java", "-jar", "ASTParser.jar"])
+useless_tokens = [
+    0,
+    1,
+    2, 3, 4,
+    5, 6, 58, 176, 131, 128, 133, 132, 138
+]
+
+
+def collapse_tree(tree: Node) -> Node:
+    if not tree.is_terminal:
+        if tree.node_index in useless_tokens and tree.parent is not None:
+            assert len(tree.children) == 1
+            child = tree.children[0]
+            tree.parent.children.remove(tree)
+            tree.parent.children.append(child)
+            child.parent = tree.parent
+            collapse_tree(child)
+        else:
+            for child in tree.children:
+                collapse_tree(child)
+    return tree
 
 
 def main():
-    jvm_process = subprocess.Popen(["java", "-jar", os.getcwd() + "/ASTParser.jar"])
-    # jvm_process.start()
-    # wait for jvm run
-    time.sleep(1)
-    filename = '../Dataset/java_files/Animation.java'
+    filename = '../Dataset/java_files/ActionId.java'
     gateway = JavaGateway()
     parser = gateway.entry_point.getParser()
     ast = parser.parseFile(filename)
 
-    jvm_process.kill()
-
     ast = parse_tree(ast)
     print(ast)
+    print('____________________________________')
+    cl_ast = collapse_tree(ast)
+    print(cl_ast)
 
 
 if __name__ == '__main__':
