@@ -3,8 +3,6 @@ from collections import namedtuple
 import theano.tensor
 import numpy as np
 
-from AST.TokenMap import token_map
-
 NUM_FEATURES = 30
 
 margin = 1

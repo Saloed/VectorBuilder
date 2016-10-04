@@ -5,7 +5,6 @@ import theano.tensor as T
 from lasagne.updates import adadelta, nesterov_momentum, adam
 from theano import function
 
-from AST.TokenMap import token_map
 from Embeddings.Parameters import Parameters, MARGIN, LEARN_RATE
 from TBCNN.Builder import compute_leaf_num
 from TBCNN.Connection import Connection
@@ -26,57 +25,43 @@ def compute_rates(tokens):
                     child.left_rate = 1.0 - child.right_rate
 
 
-def random_change(tokens, root_token_index):
-    def rand_token():
-        return list(token_map.keys())[np.random.randint(0, len(token_map))]
-
-    change_index = np.random.randint(root_token_index + 1, len(tokens))
-    current = tokens[change_index]
-    new_token = rand_token()
-    while current.token_type == new_token:
-        new_token = rand_token()
-    current.token_type = new_token
-    current.token_index = token_map[new_token]
-    return tokens
-
-
 def build_net(tokens, params: Parameters, root_token_index, used_embeddings, change_index=-1, secret_param=None):
     nodes_amount = len(tokens)
     # layer index equal token index
     layers = [Layer] * nodes_amount
+    root_token = tokens[root_token_index]
 
     assert root_token_index == 0
+    assert root_token.index == root_token_index
 
-    root_token = tokens[root_token_index]
-    positive_target = params.embeddings[root_token.token_index]
-    used_embeddings[root_token.token_index] = positive_target
+    positive_target = params.embeddings[root_token.token_type]
+    used_embeddings[root_token.token_type] = positive_target
     root_layer = Encoder(params.b_construct, "root_layer")
-    layers[root_token_index] = root_layer
+    layers[root_token.index] = root_layer
     used_embeddings['b_construct'] = params.b_construct
 
-    for i, node in enumerate(tokens):
-        if i == root_token_index:
+    for node in tokens:
+        if node.index == root_token_index:
             continue
-        if i == change_index:
-            layers[i] = Embedding(secret_param, "embedding_" + secret_param.name)
+        if node.index == change_index:
+            layers[node.index] = Embedding(secret_param, "embedding_" + secret_param.name)
         else:
-            emb = params.embeddings[node.token_index]
-            used_embeddings[node.token_index] = emb
-            layers[i] = Embedding(emb, "embedding_" + str(i))
+            emb = params.embeddings[node.token_type]
+            used_embeddings[node.token_type] = emb
+            layers[node.index] = Embedding(emb, "embedding_" + str(node))
 
-    for i in range(nodes_amount):
-        node = tokens[i]
+    for node in tokens:
         if node.parent is None: continue
 
-        from_layer = layers[i]
-        to_layer = layers[node.parent]
+        from_layer = layers[node.index]
+        to_layer = layers[node.parent.index]
 
         if node.left_rate != 0:
             Connection(from_layer, to_layer, params.w['w_left'],
-                       w_coeff=node.left_rate * node.leaf_num / tokens[node.parent].leaf_num)
+                       w_coeff=node.left_rate * node.leaf_num / node.parent.leaf_num)
         if node.right_rate != 0:
             Connection(from_layer, to_layer, params.w['w_right'],
-                       w_coeff=node.right_rate * node.leaf_num / tokens[node.parent].leaf_num)
+                       w_coeff=node.right_rate * node.leaf_num / node.parent.leaf_num)
 
     return positive_target, layers
 

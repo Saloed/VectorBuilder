@@ -1,7 +1,7 @@
 import _pickle as c_pickle
 from random import shuffle
 import theano
-from AST.Sampler import PreparedAST, generate_samples
+from AST.Sampler import PreparedAST, generate_samples, build_asts
 from Embeddings.Construct import construct
 from Embeddings.Evaluation import EvaluationSet, process_network, EvaluationSet
 from Embeddings.InitEmbeddings import initialize
@@ -87,29 +87,31 @@ def create_batches(data):
 def epoch_step(params, epoch_num, retry_num, tparams, batches, train_set_size, decay):
     shuffle(batches)
     train_set = batches[:train_set_size]
-    validation_set = batches[train_set_size + 1:]
+    # validation_set = batches[train_set_size + 1:]
     alpha, prev_t_ast, prev_t_token, prev_v_ast, prev_v_token, _ = tparams
+    v_error_per_ast = 0
+    v_error_per_token = 0
     fprint(['train set'])
     result = process_batches(train_set, params, alpha, decay, False)
     if result is None:
         return
     t_error_per_ast, t_error_per_token = result
-    fprint(['validation set'])
-    result = process_batches(validation_set, params, alpha, decay, True)
-    if result is None:
-        return
-    v_error_per_ast, v_error_per_token = result
+    # fprint(['validation set'])
+    # result = process_batches(validation_set, params, alpha, decay, True)
+    # if result is None:
+    #     return
+    # v_error_per_ast, v_error_per_token = result
 
     dtpt = prev_t_token - t_error_per_token
     dtpa = prev_t_ast - t_error_per_ast
-    dvpt = prev_v_token - v_error_per_token
-    dvpa = prev_v_ast - v_error_per_ast
+    # dvpt = prev_v_token - v_error_per_token
+    # dvpa = prev_v_ast - v_error_per_ast
     print_str = [
         'end of epoch {0} retry {1}'.format(epoch_num, retry_num),
         'train\t|\t{}\t|\t{}'.format(t_error_per_token, t_error_per_ast),
         'delta\t|\t{}\t|\t{}'.format(dtpt, dtpa),
-        'validation\t|\t{}\t|\t{}'.format(v_error_per_token, v_error_per_ast),
-        'delta\t|\t{}\t|\t{}'.format(dvpt, dvpa),
+        # 'validation\t|\t{}\t|\t{}'.format(v_error_per_token, v_error_per_ast),
+        # 'delta\t|\t{}\t|\t{}'.format(dvpt, dvpa),
         '################'
     ]
     fprint(print_str, log_file)
@@ -117,9 +119,10 @@ def epoch_step(params, epoch_num, retry_num, tparams, batches, train_set_size, d
     if epoch_num % 100 == 0:
         with open('NewParams/new_params_t' + str(retry_num) + "_ep" + str(epoch_num), mode='wb') as new_params:
             c_pickle.dump(params, new_params)
-    valid_size = len(validation_set)
+
+    train_size = len(train_set)
     return TrainingParams(alpha, t_error_per_ast, t_error_per_token, v_error_per_ast, v_error_per_token,
-                          v_error_per_ast / valid_size)
+                          t_error_per_ast / train_size)
 
 
 TrainingParams = namedtuple('TrainingParams',
@@ -135,9 +138,9 @@ def reset_batches(batches):
 
 
 @safe_run
-def train_step(retry_num, batches, train_set_size, decay):
+def train_step(retry_num, batches, train_set_size, token_set, decay):
     tparams = TrainingParams(LEARN_RATE * (1 - MOMENTUM), 0, 0, 0, 0, 0)
-    nparams = initialize()
+    nparams = initialize(token_set)
     reset_batches(batches)
     plot_axes, plot = new_figure(retry_num, EPOCH_IN_RETRY)
 
@@ -154,16 +157,18 @@ def main():
     dataset_dir = '../Dataset/'
     with open(dataset_dir + 'ast_file', mode='rb') as ast_file:
         data_ast = c_pickle.load(ast_file)
-    batches = create_batches(data_ast)
+    token_set = data_ast.token_set
+    batches = create_batches(data_ast.ast_set)
     batches = batches[0:SAMPLES_AMOUNT // BATCH_SIZE]
     decay = 5e-5
-    train_set_size = (len(batches) // 10) * 8
+    # train_set_size = (len(batches) // 10) * 8
+    train_set_size = len(batches) - 1
     print(len(batches))
     for train_retry in range(NUM_RETRY):
-        train_step(train_retry, batches, train_set_size, decay)
+        train_step(train_retry, batches, train_set_size, token_set, decay)
 
 
 if __name__ == '__main__':
     gc.enable()
     main()
-    # build_asts('../Dataset/')
+    # build_asts('../Dataset/java_files/')

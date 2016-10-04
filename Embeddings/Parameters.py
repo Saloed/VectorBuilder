@@ -1,7 +1,7 @@
 from theano.compile import SharedVariable as SV
 
 NUM_FEATURES = 30
-SAMPLES_AMOUNT = 4500
+SAMPLES_AMOUNT = 6000
 MARGIN = 1
 LEARN_RATE = 0.005
 MOMENTUM = 0.1
@@ -13,7 +13,7 @@ BATCH_SIZE = 10
 
 class Parameters:
     def __init__(self,
-                 w_left: SV, w_right: SV, b_construct: SV, embeddings: list):
+                 w_left: SV, w_right: SV, b_construct: SV, embeddings: dict):
         self.w = {
             'w_left': w_left,
             'w_right': w_right

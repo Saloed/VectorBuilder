@@ -1,11 +1,8 @@
 import os
-import pickle
-import numpy as np
-from copy import deepcopy
+import _pickle as pickle
 
-from AST import Token
-from AST.TokenMap import token_map
-from AST.Tokenizer import build_ast
+from AST.Token import Token
+from AST.Tokenizer import *
 
 
 class PreparedAST:
@@ -17,84 +14,63 @@ class PreparedAST:
         self.eval_set_file = None
 
 
+class ASTSet:
+    def __init__(self, all_tokens, asts):
+        self.token_set = all_tokens
+        self.ast_set = asts
+
+
 def build_asts(dataset_dir):
-    base_dir = dataset_dir
-    dataset_dir += 'java_files/'
+    parser = parser_init()
     files = os.listdir(dataset_dir)
+    tokens = get_all_available_tokens(parser)
     data_ast = []
     for file in files:
         try:
-            ast = build_ast(dataset_dir + file)
+            print(file)
+            ast = build_ast(dataset_dir + file, parser)
             data_ast.append(ast)
-        except Exception:
+        except Exception as ex:
+            print(ex)
             continue
-    ast_file = open(base_dir + 'ast_file', mode='wb')
-    pickle.dump(data_ast, ast_file)
+    print('end ast building')
+    ast_set = ASTSet(tokens, data_ast)
+    with open(dataset_dir + '../ast_file', mode='wb') as ast_file:
+        pickle.dump(ast_set, ast_file)
 
 
-def prepare_ast(full_ast, training_token_index):
+def copy_with_depth(node: Token, depth=1, parent=None) -> Token:
+    node_copy = Token(node.token_type, parent, node.is_leaf, node.pos, node.start_line, node.end_line)
+    if parent is not None:
+        parent.children.append(node_copy)
+    if depth != 0:
+        for child in node.children:
+            copy_with_depth(child, depth - 1, node_copy)
+    else:
+        node_copy.is_leaf = True
+    return node_copy
+
+
+def prepare_ast(full_ast: Nodes):
     nodes_with_depth = []
 
     def compute_depth(node: Token, depth):
-        if len(node.children) != 0:
+        if not node.is_leaf:
             nodes_with_depth.append((node, depth))
             for child in node.children:
                 compute_depth(child, depth + 1)
 
-    compute_depth(full_ast[-1], 0)
-    nodes_with_depth.sort(key=lambda tup: tup[1])
-    nodes = [deepcopy(node[0]) for node in reversed(nodes_with_depth)]
-
-    class Indexer:
-        def __init__(self):
-            self.indexer = 0
-
-        def children(self, node: Token, ast=None, parent=None, need_more=True) -> list:
-            if ast is None:
-                ast = []
-                assert training_token_index == self.indexer
-            node.parent = parent
-            node.pos = self.indexer
-            ast.append(node)
-            self.indexer += 1
-            if need_more:
-                for child in node.children:
-                    self.children(child, ast, node.pos, need_more=False)
-            else:
-                node.children = []
-            return ast
-
-    return [Indexer().children(node) for node in nodes]
+    compute_depth(full_ast.root_node, 0)
+    nodes_with_depth.sort(key=lambda tup: tup[1], reverse=True)
+    return [tree_to_list(copy_with_depth(node[0])) for node in nodes_with_depth]
 
 
 def generate_samples(data, ast_list: list, training_token_index):
-    prepared = prepare_ast(data, training_token_index)
+    prepared = prepare_ast(data)
     for ast in prepared:
         ast_len = len(ast)
-        if ast_len < 3 or ast_len > 25:
-            continue
         training_token = ast[training_token_index]
 
-        def rand_token():
-            return list(token_map.keys())[np.random.randint(0, len(token_map))]
-
         assert training_token_index == 0
-        # for token in ast[training_token_index + 1:]:
-        #     while token.token_type == training_token.token_type:
-        #         new_token = rand_token()
-        #         token.token_type = new_token
-        #         token.token_index = token_map[new_token]
-        # def create_negative(token_index):
-        #     sample = deepcopy(ast)
-        #     current = sample[token_index]
-        #     new_token = rand_token()
-        #     while current.token_type == new_token:
-        #         new_token = rand_token()
-        #     current.token_type = new_token
-        #     current.token_index = token_map[new_token]
-        #     return sample
-        #
-        # # rand from 1 because root_token_index is 0
-        # samples = [create_negative(i) for i in np.random.random_integers(1, len(ast) - 1, size=1)]
 
         ast_list.append(PreparedAST(ast, training_token, training_token_index, ast_len))

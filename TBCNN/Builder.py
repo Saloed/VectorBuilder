@@ -1,7 +1,6 @@
 import theano.tensor as T
 from theano import function
-
-from AST.Tokenizer import ast_to_nodes, Nodes
+from AST.Tokenizer import Nodes
 from TBCNN.Connection import Connection, PoolConnection
 from TBCNN.Layer import *
 from TBCNN.NetworkParams import *

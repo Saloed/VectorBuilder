@@ -14,4 +14,4 @@ class Token:
         self.end_line = end_line
 
     def __str__(self):
-        return str(self.token_type) + str(self.index)
+        return str(self.token_type) + '_' + str(self.index)

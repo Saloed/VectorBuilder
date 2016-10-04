@@ -1,51 +1,34 @@
 import numpy as np
 from Embeddings.Parameters import *
-from AST.TokenMap import token_map
 from theano import shared
 from theano.compile import SharedVariable as SV, theano
 
 randomizer = np.random.RandomState(314)
 
 
-def init_params(old_weights, amount=None, new_weights=None, upper=None, lower=None):
-    old_len = len(old_weights)
-    if new_weights is not None:
-        new_weights = np.array(new_weights)
-        amount = len(new_weights)
-        old_weights = np.concatenate((old_weights, new_weights.reshape(-1)))
+def reshape_and_cast(param, shape, dtype):
+    return np.asarray(param.reshape(shape),
+                      dtype=dtype)
+
+
+def rand_param(shape_0, shape_1=1, name='', dtype=theano.config.floatX):
+    size = shape_0 * shape_1
+    param = randomizer.uniform(-RANDOM_RANGE, RANDOM_RANGE, size)
+    if shape_1 != 1:
+        param = reshape_and_cast(param, (shape_0, shape_1), dtype)
     else:
-        if upper is None or lower is None:
-            upper = RANDOM_RANGE
-            lower = -RANDOM_RANGE
-        rnd_weights = randomizer.uniform(lower, upper, amount)
-        old_weights = np.concatenate((old_weights, rnd_weights.reshape(-1)))
-    return old_weights, range(old_len, old_len + amount)
+        param = reshape_and_cast(param, shape_0, dtype)
+    return shared(param, name=name)
 
 
-def initialize():
-    token_amount = len(token_map)
+def initialize(tokens):
+    dtype = theano.config.floatX
+    w_left = rand_param(NUM_FEATURES, NUM_FEATURES, 'w_left', dtype)
+    w_right = rand_param(NUM_FEATURES, NUM_FEATURES, 'w_right', dtype)
+    b_construct = rand_param(NUM_FEATURES, name='b_construct', dtype=dtype)
 
-    weights = np.array([])
-    embeddings = np.array([])
-    b_construct = np.array([])
+    embeddings = {}
+    for token in tokens:
+        embeddings[token] = rand_param(NUM_FEATURES, name='emb_' + token, dtype=dtype)
 
-    weights, w_left_range = init_params(weights, NUM_FEATURES * NUM_FEATURES)
-    weights, w_right_range = init_params(weights, NUM_FEATURES * NUM_FEATURES)
-    embeddings, _ = init_params(embeddings, NUM_FEATURES * token_amount)
-    b_construct, _ = init_params(b_construct, NUM_FEATURES)
-
-    w_left = shared(np.asarray(weights[w_left_range].reshape((NUM_FEATURES, NUM_FEATURES)),
-                               dtype=theano.config.floatX), 'w_left')
-    w_right = shared(np.asarray(weights[w_right_range].reshape((NUM_FEATURES, NUM_FEATURES))
-                                , dtype=theano.config.floatX), 'w_right')
-    b_construct = shared(np.asarray(b_construct.reshape(NUM_FEATURES)
-                                    , dtype=theano.config.floatX), 'b_construct')
-
-    shared_embs = [None] * token_amount
-    for token, index in token_map.items():
-        target = index * NUM_FEATURES
-        area = range(target, target + NUM_FEATURES)
-        emb = np.asarray(embeddings[area], dtype=theano.config.floatX)
-        shared_embs[index] = shared(emb, 'emb_' + token)
-
-    return Parameters(w_left, w_right, b_construct, shared_embs)
+    return Parameters(w_left, w_right, b_construct, embeddings)

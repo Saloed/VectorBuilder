@@ -1,6 +1,5 @@
 from collections import namedtuple
 
-from javalang.ast import *
 from py4j.java_gateway import JavaGateway, get_field
 
 from AST.Token import Token
@@ -14,6 +13,17 @@ def parser_init():
     return parser
 
 
+def tree_to_list(tree_root_token: Token) -> list:
+    def convert(token: Token, tokens: list):
+        tokens.append(token)
+        for child in token.children:
+            convert(child, tokens)
+
+    token_list = []
+    convert(tree_root_token, token_list)
+    return _indexate(token_list)
+
+
 def _parse_token(node, parent, pos) -> Token:
     node_name = get_field(node, 'nodeName')
     is_terminal = get_field(node, 'isTerminal')
@@ -22,27 +32,26 @@ def _parse_token(node, parent, pos) -> Token:
     return Token(node_name, parent, is_terminal, pos, src_start, src_end)
 
 
-def _parse_tree(root, all_nodes, parent=None, pos=0) -> Node:
+def _parse_tree(root, parent=None, pos=0) -> Token:
     node = _parse_token(root, parent, pos)
-    all_nodes.append(node)
     if parent is not None:
         parent.children.append(node)
     children = get_field(root, 'children')
     for i, child in enumerate(children):
-        _parse_tree(child, all_nodes, node, i)
+        _parse_tree(child, node, i)
     return node
 
 
-def _indexate(nodes):
+def _indexate(nodes) -> list:
     for i, node in enumerate(nodes):
         node.index = i
+    return nodes
 
 
 def build_ast(filename, parser):
     ast = parser.parseFile(filename)
-    all_nodes = []
-    root_node = _parse_tree(ast, all_nodes)
-    _indexate(all_nodes)
+    root_node = _parse_tree(ast)
+    all_nodes = tree_to_list(root_node)
     non_leafs = [node for node in all_nodes if not node.is_leaf]
     return Nodes(root_node, all_nodes, non_leafs)
 
@@ -58,7 +67,8 @@ def _shifted_string(token: Token, shift="") -> str:
 
 
 def get_all_available_tokens(parser) -> list:
-    return parser.getAllAvailableTokens()
+    tokens = parser.getAllAvailableTokens()
+    return [str(token) for token in tokens]
 
 
 def print_ast(ast_root_node):
