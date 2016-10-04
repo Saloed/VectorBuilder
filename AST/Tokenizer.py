@@ -1,100 +1,74 @@
 from collections import namedtuple
 
-from AST.Token import Token
-from AST.TokenMap import token_map
-from javalang.parser import parse
 from javalang.ast import *
-from javalang import *
-import javalang.tree as T
-import sys, inspect
+from py4j.java_gateway import JavaGateway, get_field
 
-# def print_classes():
-#     tt = dict()
-#     counter = 0
-#     for name, obj in inspect.getmembers(sys.modules[T.__name__]):
-#         if inspect.isclass(obj):
-#             temp = obj  # .__init__(temp)
-#             tt[temp.__name__] = counter
-#             counter += 1
-#     return tt
+from AST.Token import Token
 
 Nodes = namedtuple('Nodes', ['root_node', 'all_nodes', 'non_leafs'])
 
 
-def ast_to_nodes(ast) -> list:
+def parser_init():
+    gateway = JavaGateway()
+    parser = gateway.entry_point.getParser()
+    return parser
+
+
+def _parse_token(node, parent, pos) -> Token:
+    node_name = get_field(node, 'nodeName')
+    is_terminal = get_field(node, 'isTerminal')
+    src_start = get_field(node, 'sourceStart')
+    src_end = get_field(node, 'sourceEnd')
+    return Token(node_name, parent, is_terminal, pos, src_start, src_end)
+
+
+def _parse_tree(root, all_nodes, parent=None, pos=0) -> Node:
+    node = _parse_token(root, parent, pos)
+    all_nodes.append(node)
+    if parent is not None:
+        parent.children.append(node)
+    children = get_field(root, 'children')
+    for i, child in enumerate(children):
+        _parse_tree(child, all_nodes, node, i)
+    return node
+
+
+def _indexate(nodes):
+    for i, node in enumerate(nodes):
+        node.index = i
+
+
+def build_ast(filename, parser):
+    ast = parser.parseFile(filename)
     all_nodes = []
-    tokenize(ast, None, None, 0, all_nodes)
-    root_node = all_nodes[0]
-    non_leafs = []
-    for node in all_nodes:
-        if len(node.children) != 0:
-            non_leafs.append(node)
-    reorder(all_nodes)
+    root_node = _parse_tree(ast, all_nodes)
+    _indexate(all_nodes)
+    non_leafs = [node for node in all_nodes if not node.is_leaf]
     return Nodes(root_node, all_nodes, non_leafs)
 
 
-def print_ast(ast, shift=""):
-    if ast is None:
-        return
-    if isinstance(ast, Node):
-        print(shift, ast)
-        for child in ast.children:
-            print_ast(child, shift + '\t')
-    elif isinstance(ast, list):
-        for el in ast:
-            print_ast(el, shift)
-    else:
-        return
+def _shifted_string(token: Token, shift="") -> str:
+    string = '\n{}┗ {} [{}:{}]'.format(shift, str(token), token.start_line, token.end_line)
+    for child in token.children:
+        if child.is_leaf:
+            string += " " + str(child)
+        else:
+            string += _shifted_string(child, shift + " ")
+    return string
 
 
-def print_tokens(tokens):
-    def print_token(token, shift=""):
-        print(shift, token.token_type)
-        for child in token.children:
-            print_token(child, shift + "\t")
-
-    print_token(tokens[0])
+def get_all_available_tokens(parser) -> list:
+    return parser.getAllAvailableTokens()
 
 
-def build_ast(filename) -> list:
-    file = open(filename, 'r')
-    code = ""
-    lines = file.readlines()
-    for line in lines:
-        code += line
-    ast = parse.parse(code)
-    # print_ast(ast)
-    # print(print_classes())
-    return ast_to_nodes(ast)
+def print_ast(ast_root_node):
+    print(_shifted_string(ast_root_node))
 
 
-def tokenize(root, parent, parent_id, pos, nodes):
-    if root is None:
-        return 0
-    if isinstance(root, Node):
-        token_type = root.__repr__()
-        token = Token(token_type, token_map[token_type],
-                      parent, pos)
-        nodes.append(token)
-        if parent is not None:
-            parent.children.append(token)
-
-        children = root.children
-        cur_id = len(nodes)
-        child_num = 0
-        for child in children:
-            child_num += tokenize(child, token, cur_id, child_num, nodes)
-        return 1
-    elif isinstance(root, list):
-        child_num = pos
-        for el in root:
-            child_num += tokenize(el, parent, parent_id, child_num, nodes)
-        return child_num - pos
-    else:
-        return 0
-
-
-def reorder(nodes):
-    nodes.reverse()
-    for i, node in enumerate(nodes):
-        node.index = i
+if __name__ == '__main__':
+    parser = parser_init()
+    tokens = get_all_available_tokens(parser)
+    print(tokens)
+    test_filename = '../Dataset/java_files/LayoutEngine.java'
+    ast = build_ast(test_filename, parser)
+    print_ast(ast.root_node)
