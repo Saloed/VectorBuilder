@@ -12,6 +12,7 @@ class Token:
         self.index = None
         self.start_line = start_line
         self.end_line = end_line
+        self.author = None
 
     def __str__(self):
         return str(self.token_type) + '_' + str(self.index)

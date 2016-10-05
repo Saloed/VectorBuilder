@@ -11,9 +11,11 @@ def clustering(file_with_params):
 
     embeddings = params.embeddings
 
-    names = [e.name for e in embeddings]
-    values = [e.get_value() for e in embeddings]
-
+    # weights = [w.eval() for w in list(params.w.values())]
+    # print(weights)
+    names = list(embeddings.keys())
+    values = [embeddings[key].eval() for key in names]
+    # print(values)
     X = np.array(values)
     Z = linkage(X)
     fig = plt.figure(figsize=(200, 100))

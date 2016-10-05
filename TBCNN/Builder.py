@@ -1,5 +1,8 @@
 import theano.tensor as T
+from lasagne.updates import adadelta
 from theano import function
+from theano.tensor.tests.mlp_test import LogisticRegression
+from lasagne import nonlinearities, objectives
 from AST.Tokenizer import Nodes
 from TBCNN.Connection import Connection, PoolConnection
 from TBCNN.Layer import *
@@ -13,7 +16,7 @@ class NodeInfo(Enum):
     unknown = 'u'
 
 
-def construct_from_nodes(ast: Nodes, parameters: Params, need_back_prop=False):
+def construct_from_nodes(ast: Nodes, parameters: Params, need_back_prop, author_amount):
     nodes = ast.all_nodes
     for node in nodes:
         len_children = len(node.children)
@@ -30,7 +33,7 @@ def construct_from_nodes(ast: Nodes, parameters: Params, need_back_prop=False):
     avg_depth *= .6
     if avg_depth < 1:        avg_depth = 1
 
-    return construct_network(ast, parameters, need_back_prop, avg_depth)
+    return construct_network(ast, parameters, need_back_prop, avg_depth, author_amount)
 
 
 def compute_leaf_num(root, nodes, depth=0):
@@ -96,15 +99,15 @@ def convolve_creator(root_node, node_info: NodeInfo, conv_layers, depth, cp: Con
         convolve_creator(child, child_info, conv_layers, depth + 1, cp)
 
 
-def build_net(nodes: Nodes, params: Params, pool_cutoff):
+def build_net(nodes: Nodes, params: Params, pool_cutoff, authors_amount):
     used_embeddings = {}
     nodes_amount = len(nodes.all_nodes)
 
     _layers = [Layer] * nodes_amount
 
     for node in nodes.all_nodes:
-        emb = params.embeddings[node.token_index]
-        used_embeddings[node.token_index] = emb
+        emb = params.embeddings[node.token_type]
+        used_embeddings[node.token_type] = emb
         _layers[node.index] = Embedding(emb, "embedding_" + str(node))
 
     for node in nodes.non_leafs:
@@ -138,8 +141,8 @@ def build_net(nodes: Nodes, params: Params, pool_cutoff):
         e_z = T.exp(z - z.max(axis=0, keepdims=True))
         return e_z / e_z.sum(axis=0, keepdims=True)
 
-    out_layer = FullConnected(params.b['b_out'], activation=softmax,
-                              name="softmax", feature_amount=NUM_OUT_LAYER)
+    out_layer = FullConnected(params.b['b_out'], activation=T.nnet.softmax,
+                              name="softmax", feature_amount=authors_amount)
 
     Connection(pool_top, dis_layer, params.w['w_dis_top'])
     Connection(pool_left, dis_layer, params.w['w_dis_left'])
@@ -155,11 +158,11 @@ def build_net(nodes: Nodes, params: Params, pool_cutoff):
 
     layers.append(dis_layer)
     layers.append(out_layer)
-    return layers
+    return layers, used_embeddings
 
 
-def construct_network(nodes: Nodes, parameters: Params, need_back_prop: bool, pool_cutoff):
-    net = build_net(nodes, parameters, pool_cutoff)
+def construct_network(nodes: Nodes, parameters: Params, need_back_prop: bool, pool_cutoff, author_amount):
+    net, used_embeddings = build_net(nodes, parameters, pool_cutoff, author_amount)
 
     def f_builder(layer: Layer):
         if layer.forward is None:
@@ -170,11 +173,16 @@ def construct_network(nodes: Nodes, parameters: Params, need_back_prop: bool, po
             layer.build_forward()
 
     def back_propagation(net_forward):
-        if not need_back_prop:
-            return None, None
-        pass
+        target = T.iscalar('target')
+        cost = T.nnet.categorical_crossentropy(net_forward, target)
+
+        if need_back_prop:
+            used_params = list(used_embeddings.values()) + list(parameters.b.values()) + list(parameters.w.values())
+            updates = adadelta(cost, used_params)
+            return function([target], cost, updates=updates)
+        else:
+            return function([target], cost)
 
     f_builder(net[-1])
     net_forward = net[-1].forward
-    net_back, net_validation = back_propagation(net_forward)
-    return Network(net_forward, net_back, net_validation)
+    return back_propagation(net_forward)

@@ -71,6 +71,31 @@ def get_all_available_tokens(parser) -> list:
     return [str(token) for token in tokens]
 
 
+def _method_search(root: Token, methods: list) -> list:
+    if root.token_type == 'MethodDeclaration':
+        root.parent.children.remove(root)
+        root.parent = None
+        methods.append(root)
+    else:
+        for child in root.children:
+            _method_search(child, methods)
+    return methods
+
+
+def divide_by_methods(ast: Nodes) -> list:
+    methods = _method_search(ast.root_node, [])
+    if len(methods) == 0:
+        return []
+    else:
+        def _to_nodes(m) -> Nodes:
+            root_node = m
+            all_nodes = tree_to_list(root_node)
+            non_leafs = [node for node in all_nodes if not node.is_leaf]
+            return Nodes(root_node, all_nodes, non_leafs)
+
+        return [_to_nodes(m) for m in methods]
+
+
 def print_ast(ast_root_node):
     print(_shifted_string(ast_root_node))
 
