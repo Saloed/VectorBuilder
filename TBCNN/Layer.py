@@ -51,7 +51,7 @@ class Encoder(Layer):
 
     def build_forward(self):
         connections = [c.forward for c in self.in_connection]
-        z = T.sum(T.join(0, connections), axis=0, acc_dtype=theano.config.floatX)
+        z = T.sum(connections, axis=0, acc_dtype=theano.config.floatX)
         self.forward = self.activation(T.add(z, self.bias))
 
 
@@ -77,7 +77,7 @@ class FullConnected(Layer):
 
     def build_forward(self):
         connections = [c.forward for c in self.in_connection]
-        z = T.sum(T.join(0, connections), axis=0, acc_dtype=theano.config.floatX)
+        z = T.sum(connections, axis=0, acc_dtype=theano.config.floatX)
         self.forward = self.activation(T.add(z, self.bias))
 
 
@@ -87,4 +87,5 @@ class Pooling(Layer):
 
     def build_forward(self):
         connections = [c.forward for c in self.in_connection]
+        print(connections)
         self.forward = T.max(connections, axis=0)

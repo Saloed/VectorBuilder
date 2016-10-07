@@ -17,6 +17,8 @@ theano.config.floatX = 'float32'
 theano.config.mode = 'FAST_COMPILE'
 
 
+# theano.config.exception_verbosity = 'high'
+
 def generate_author_file():
     data_set = get_repo_methods_with_authors('../Dataset/TestRepo/')
     with open('../Dataset/author_file', 'wb') as f:
@@ -122,8 +124,8 @@ def main():
 
     all_authors = dataset.all_authors
     batches = generate_batches(dataset.methods_with_authors)
-    batches = batches[:1000]
-    test_set = batches[1001:1200]
+    batches = batches[:1]
+    test_set = batches[2:3]
     for train_retry in range(NUM_RETRY):
         train_step(train_retry, batches, test_set, all_authors)
 

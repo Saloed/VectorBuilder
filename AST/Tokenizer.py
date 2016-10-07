@@ -1,5 +1,5 @@
 from collections import namedtuple
-
+import pydot
 from py4j.java_gateway import JavaGateway, get_field
 
 from AST.Token import Token
@@ -98,6 +98,19 @@ def divide_by_methods(ast: Nodes) -> list:
 
 def print_ast(ast_root_node):
     print(_shifted_string(ast_root_node))
+
+
+def _create_graph(node, graph):
+    node_name = str(node)
+    for child in node.children:
+        graph.add_edge(pydot.Edge(node_name, str(child)))
+        _create_graph(child, graph)
+
+
+def visualize(ast_root_node, filename):
+    graph = pydot.Dot(graph_type='graph')
+    _create_graph(ast_root_node, graph)
+    graph.write_png(filename)
 
 
 if __name__ == '__main__':

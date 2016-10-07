@@ -3,7 +3,9 @@ from lasagne.updates import adadelta
 from theano import function
 from theano.tensor.tests.mlp_test import LogisticRegression
 from lasagne import nonlinearities, objectives
-from AST.Tokenizer import Nodes
+
+from AST.Token import Token
+from AST.Tokenizer import Nodes, print_ast, visualize
 from TBCNN.Connection import Connection, PoolConnection
 from TBCNN.Layer import *
 from TBCNN.NetworkParams import *
@@ -16,19 +18,23 @@ class NodeInfo(Enum):
     unknown = 'u'
 
 
-def construct_from_nodes(ast: Nodes, parameters: Params, need_back_prop, author_amount):
-    nodes = ast.all_nodes
-    for node in nodes:
-        len_children = len(node.children)
-        if len_children >= 0:
-            for child in node.children:
-                if len_children == 1:
-                    child.left_rate = .5
-                    child.right_rate = .5
-                else:
-                    child.right_rate = child.pos / (len_children - 1.0)
-                    child.left_rate = 1.0 - child.right_rate
+def compute_rates(root_node: Token):
+    if not root_node.is_leaf:
+        len_children = len(root_node.children)
+        for child in root_node.children:
+            if len_children == 1:
+                child.left_rate = .5
+                child.right_rate = .5
+            else:
+                child.right_rate = child.pos / (len_children - 1.0)
+                child.left_rate = 1.0 - child.right_rate
+            compute_rates(child)
 
+
+def construct_from_nodes(ast: Nodes, parameters: Params, need_back_prop, author_amount):
+    visualize(ast.root_node, 'ast.png')
+    nodes = ast.all_nodes
+    compute_rates(ast.root_node)
     _, _, avg_depth = compute_leaf_num(ast.root_node, nodes)
     avg_depth *= .6
     if avg_depth < 1:        avg_depth = 1
@@ -37,11 +43,10 @@ def construct_from_nodes(ast: Nodes, parameters: Params, need_back_prop, author_
 
 
 def compute_leaf_num(root, nodes, depth=0):
-    if len(root.children) == 0:
+    if root.is_leaf:
         root.leaf_num = 1
         root.children_num = 1
         return 1, 1, depth  # leaf_num, children_num, depth
-    root.allLeafNum = 0
     avg_depth = 0.0
     for child in root.children:
         leaf_num, children_num, child_avg_depth = compute_leaf_num(child, nodes, depth + 1)
@@ -91,11 +96,11 @@ def convolve_creator(root_node, node_info: NodeInfo, conv_layers, depth, cp: Con
         else:
             child_num = child_len - 1
             if child_num == 0:
-                child_info = 'u'
+                child_info = NodeInfo.unknown
             elif child.pos <= child_num / 2.0:
-                child_info = 'l'
+                child_info = NodeInfo.left
             else:
-                child_info = 'r'
+                child_info = NodeInfo.right
         convolve_creator(child, child_info, conv_layers, depth + 1, cp)
 
 
@@ -163,6 +168,7 @@ def build_net(nodes: Nodes, params: Params, pool_cutoff, authors_amount):
 
 def construct_network(nodes: Nodes, parameters: Params, need_back_prop: bool, pool_cutoff, author_amount):
     net, used_embeddings = build_net(nodes, parameters, pool_cutoff, author_amount)
+    print(pool_cutoff)
 
     def f_builder(layer: Layer):
         if layer.forward is None:
@@ -184,5 +190,6 @@ def construct_network(nodes: Nodes, parameters: Params, need_back_prop: bool, po
             return function([target], cost)
 
     f_builder(net[-1])
+
     net_forward = net[-1].forward
     return back_propagation(net_forward)
