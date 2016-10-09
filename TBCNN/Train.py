@@ -47,12 +47,21 @@ def fprint(print_str: list, file=log_file):
     file.flush()
 
 
+def build_revers(authors):
+    index = {}
+    for uauthor in authors:
+        for author in uauthor[1]:
+            index[author] = uauthor[0]
+    return index
+
+
 def process_set(batches, nparams, need_back, authors):
     err = 0
     size = len(batches)
-    author_amount = len(list(authors.values()))
+    author_amount = len(authors)
+    reverse_index = build_revers(authors)
     for batch in batches:
-        author = authors[batch.author]
+        author = reverse_index[batch.author]
         if need_back:
             if batch.back is None:
                 batch.back = construct_from_nodes(batch.ast, nparams, need_back, author_amount)
@@ -65,7 +74,7 @@ def process_set(batches, nparams, need_back, authors):
 
 
 # @safe_run
-def epoch_step(nparams, train_epoch, retry_num, batches, test_set, authors: dict):
+def epoch_step(nparams, train_epoch, retry_num, batches, test_set, authors):
     shuffle(batches)
     fprint(['train set'])
     result = process_set(batches, nparams, True, authors)
@@ -101,21 +110,41 @@ def reset_batches(batches):
 
 
 # @safe_run
-def train_step(retry_num, batches, test_set, all_authors):
-    nparams = init_params(all_authors)
+def train_step(retry_num, batches, test_set, authors):
+    nparams = init_params(authors)
     reset_batches(batches)
     reset_batches(test_set)
-    plot_axes, plot = new_figure(retry_num, NUM_EPOCH)
-    authors = {}
-    for i, author in enumerate(all_authors):
-        authors[author] = i
+    # plot_axes, plot = new_figure(retry_num, NUM_EPOCH)
+
     for train_epoch in range(NUM_EPOCH):
         error = epoch_step(nparams, train_epoch, retry_num, batches, test_set, authors)
         if error is None:
             return
-        update_figure(plot, plot_axes, train_epoch, error)
+            # update_figure(plot, plot_axes, train_epoch, error)
 
-    save_to_file(plot, 'retry{}.png'.format(retry_num))
+            # save_to_file(plot, 'retry{}.png'.format(retry_num))
+
+
+def collapse_authors(authors: list):
+    unique_authors = []
+    synonym = ['Li, Yang', 'liyang@apache.org']
+
+    def search_for_new(author):
+        for uauthor in unique_authors:
+            for a in uauthor[1]:
+                if author.name in synonym and a.name in synonym:
+                    uauthor[1].append(author)
+                    return False
+
+                if a.name == author.name or a.email == author.email:
+                    uauthor[1].append(author)
+                    return False
+        return True
+
+    for a in authors:
+        if search_for_new(a):
+            unique_authors.append((len(unique_authors), [a]))
+    return unique_authors
 
 
 def main():
@@ -123,11 +152,12 @@ def main():
         dataset = P.load(f)
 
     all_authors = dataset.all_authors
+    authors = collapse_authors(all_authors)
     batches = generate_batches(dataset.methods_with_authors)
     batches = batches[:1]
     test_set = batches[2:3]
     for train_retry in range(NUM_RETRY):
-        train_step(train_retry, batches, test_set, all_authors)
+        train_step(train_retry, batches, test_set, authors)
 
 
 if __name__ == '__main__':

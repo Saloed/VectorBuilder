@@ -12,10 +12,10 @@ from TBCNN.NetworkParams import *
 from enum import Enum
 
 
-class NodeInfo(Enum):
-    left = 'l'
-    right = 'r'
-    unknown = 'u'
+# class NodeInfo(Enum):
+#     left = 'l'
+#     right = 'r'
+#     unknown = 'u'
 
 
 def compute_rates(root_node: Token):
@@ -32,7 +32,7 @@ def compute_rates(root_node: Token):
 
 
 def construct_from_nodes(ast: Nodes, parameters: Params, need_back_prop, author_amount):
-    visualize(ast.root_node, 'ast.png')
+    # visualize(ast.root_node, 'ast.png')
     nodes = ast.all_nodes
     compute_rates(ast.root_node)
     _, _, avg_depth = compute_leaf_num(ast.root_node, nodes)
@@ -62,7 +62,7 @@ ConvolveParams = namedtuple('ConvolveParams',
                             ['pool_cutoff', 'layers', 'params', 'pool_top', 'pool_left', 'pool_right'])
 
 
-def convolve_creator(root_node, node_info: NodeInfo, conv_layers, depth, cp: ConvolveParams):
+def convolve_creator(root_node, node_info, conv_layers, depth, cp: ConvolveParams):
     child_len = len(root_node.children)
     if child_len == 0: return
     conv_layer = Convolution(cp.params.b['b_conv'], "convolve_" + str(root_node))
@@ -72,9 +72,9 @@ def convolve_creator(root_node, node_info: NodeInfo, conv_layers, depth, cp: Con
     if depth < cp.pool_cutoff:
         PoolConnection(conv_layer, cp.pool_top)
     else:
-        if node_info == NodeInfo.left:
+        if node_info == 'left':
             PoolConnection(conv_layer, cp.pool_left)
-        if node_info == NodeInfo.right:
+        if node_info == 'right':
             PoolConnection(conv_layer, cp.pool_right)
 
     for child in root_node.children:
@@ -91,16 +91,16 @@ def convolve_creator(root_node, node_info: NodeInfo, conv_layers, depth, cp: Con
         if right_w != 0:
             Connection(child_layer, conv_layer, cp.params.w['w_conv_right'], right_w)
 
-        if depth != 0 and node_info != NodeInfo.unknown:
+        if depth != 0 and node_info != 'unknown':
             child_info = node_info
         else:
             child_num = child_len - 1
             if child_num == 0:
-                child_info = NodeInfo.unknown
+                child_info = 'unknown'
             elif child.pos <= child_num / 2.0:
-                child_info = NodeInfo.left
+                child_info = 'left'
             else:
-                child_info = NodeInfo.right
+                child_info = 'right'
         convolve_creator(child, child_info, conv_layers, depth + 1, cp)
 
 
@@ -137,7 +137,7 @@ def build_net(nodes: Nodes, params: Params, pool_cutoff, authors_amount):
     conv_params = ConvolveParams(pool_cutoff, _layers, params, pool_top, pool_left, pool_right)
     conv_layers = []
 
-    convolve_creator(nodes.root_node, NodeInfo.unknown, conv_layers, 0, conv_params)
+    convolve_creator(nodes.root_node, 'unknown', conv_layers, 0, conv_params)
 
     dis_layer = FullConnected(params.b['b_dis'], activation=T.tanh,
                               name='discriminative', feature_amount=NUM_DISCRIMINATIVE)
