@@ -69,20 +69,22 @@ def process_set(batches, nparams, need_back, authors):
     size = len(batches)
     author_amount = len(authors)
     reverse_index = build_vectors(authors)
-    for batch in batches:
+    for i, batch in enumerate(batches):
         author = reverse_index[batch.author]
         if need_back:
             if batch.back is None:
+                print('build {}'.format(i))
                 batch.back = construct_from_nodes(batch.ast, nparams, need_back, author_amount)
             err += batch.back(author)
         else:
             if batch.valid is None:
+                print('build {}'.format(i))
                 batch.valid = construct_from_nodes(batch.ast, nparams, need_back, author_amount)
             err += batch.valid(author)
     return err / size
 
 
-# @safe_run
+@safe_run
 def epoch_step(nparams, train_epoch, retry_num, batches, test_set, authors):
     shuffle(batches)
     fprint(['train set'])
@@ -118,19 +120,19 @@ def reset_batches(batches):
     gc.collect()
 
 
-# @safe_run
+@safe_run
 def train_step(retry_num, batches, test_set, authors):
     nparams = init_params(authors)
     reset_batches(batches)
     reset_batches(test_set)
-    plot_axes, plot = new_figure(retry_num, NUM_EPOCH, 2.0)
+    plot_axes, plot = new_figure(retry_num, NUM_EPOCH, 10.0)
     for train_epoch in range(NUM_EPOCH):
         error = epoch_step(nparams, train_epoch, retry_num, batches, test_set, authors)
         if error is None:
             return
         update_figure(plot, plot_axes, train_epoch, error)
 
-        save_to_file(plot, 'retry{}.png'.format(retry_num))
+    save_to_file(plot, 'retry{}.png'.format(retry_num))
 
 
 def collapse_authors(authors: list):
@@ -162,8 +164,9 @@ def main():
     all_authors = dataset.all_authors
     authors = collapse_authors(all_authors)
     all_batches = generate_batches(dataset.methods_with_authors)
-    batches = all_batches[:100]
-    test_set = all_batches[100:120]
+    shuffle(all_batches)
+    batches = all_batches[:500]
+    test_set = all_batches[500:600]
     for train_retry in range(NUM_RETRY):
         train_step(train_retry, batches, test_set, authors)
 
