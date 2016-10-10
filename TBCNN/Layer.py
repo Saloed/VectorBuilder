@@ -78,7 +78,9 @@ class FullConnected(Layer):
     def build_forward(self):
         connections = [c.forward for c in self.in_connection]
         z = T.sum(connections, axis=0, acc_dtype=theano.config.floatX)
+        # print(z.ndim)
         self.forward = self.activation(T.add(z, self.bias))
+        # print(self.forward.ndim)
 
 
 class Pooling(Layer):
@@ -87,5 +89,5 @@ class Pooling(Layer):
 
     def build_forward(self):
         connections = [c.forward for c in self.in_connection]
-        print(connections)
+        # print(connections)
         self.forward = T.max(connections, axis=0)

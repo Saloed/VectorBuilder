@@ -47,8 +47,8 @@ class Params:
             'w_conv_right': w_conv_right,
 
             'w_dis_top': w_dis_top,
-            'w_dis_left': w_dis_left,
-            'w_dis_right': w_dis_right,
+            # 'w_dis_left': w_dis_left,
+            # 'w_dis_right': w_dis_right,
 
             'w_out': w_out
         }

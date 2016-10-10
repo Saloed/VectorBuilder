@@ -1,6 +1,6 @@
 import _pickle as P
 from collections import namedtuple
-
+import numpy as np
 import gc
 from random import shuffle
 
@@ -32,6 +32,12 @@ class Batch:
         self.valid = None
         self.back = None
 
+    def __str__(self):
+        return '{} {}'.format(str(self.author), str(self.ast.root_node))
+
+    def __repr__(self):
+        return self.__str__()
+
 
 def generate_batches(data: list) -> list:
     return [Batch(d, d.root_node.author) for d in data]
@@ -47,11 +53,14 @@ def fprint(print_str: list, file=log_file):
     file.flush()
 
 
-def build_revers(authors):
+def build_vectors(authors):
     index = {}
+    size = len(authors)
     for uauthor in authors:
         for author in uauthor[1]:
-            index[author] = uauthor[0]
+            one_hot = np.zeros(size, dtype='int32')
+            one_hot[uauthor[0]] = 1
+            index[author] = one_hot
     return index
 
 
@@ -59,7 +68,7 @@ def process_set(batches, nparams, need_back, authors):
     err = 0
     size = len(batches)
     author_amount = len(authors)
-    reverse_index = build_revers(authors)
+    reverse_index = build_vectors(authors)
     for batch in batches:
         author = reverse_index[batch.author]
         if need_back:
@@ -115,7 +124,6 @@ def train_step(retry_num, batches, test_set, authors):
     reset_batches(batches)
     reset_batches(test_set)
     # plot_axes, plot = new_figure(retry_num, NUM_EPOCH)
-
     for train_epoch in range(NUM_EPOCH):
         error = epoch_step(nparams, train_epoch, retry_num, batches, test_set, authors)
         if error is None:
@@ -153,9 +161,9 @@ def main():
 
     all_authors = dataset.all_authors
     authors = collapse_authors(all_authors)
-    batches = generate_batches(dataset.methods_with_authors)
-    batches = batches[:1]
-    test_set = batches[2:3]
+    all_batches = generate_batches(dataset.methods_with_authors)
+    batches = all_batches[:1000]
+    test_set = all_batches[1000:1200]
     for train_retry in range(NUM_RETRY):
         train_step(train_retry, batches, test_set, authors)
 
