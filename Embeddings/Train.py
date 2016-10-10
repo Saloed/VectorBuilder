@@ -142,7 +142,7 @@ def train_step(retry_num, batches, train_set_size, token_set, decay):
     tparams = TrainingParams(LEARN_RATE * (1 - MOMENTUM), 0, 0, 0, 0, 0)
     nparams = initialize(token_set)
     reset_batches(batches)
-    plot_axes, plot = new_figure(retry_num, EPOCH_IN_RETRY)
+    plot_axes, plot = new_figure(retry_num, EPOCH_IN_RETRY, 1.1)
 
     for train_epoch in range(EPOCH_IN_RETRY):
         tparams = epoch_step(nparams, train_epoch, retry_num, tparams, batches, train_set_size, decay)

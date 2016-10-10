@@ -123,14 +123,14 @@ def train_step(retry_num, batches, test_set, authors):
     nparams = init_params(authors)
     reset_batches(batches)
     reset_batches(test_set)
-    # plot_axes, plot = new_figure(retry_num, NUM_EPOCH)
+    plot_axes, plot = new_figure(retry_num, NUM_EPOCH, 2.0)
     for train_epoch in range(NUM_EPOCH):
         error = epoch_step(nparams, train_epoch, retry_num, batches, test_set, authors)
         if error is None:
             return
-            # update_figure(plot, plot_axes, train_epoch, error)
+        update_figure(plot, plot_axes, train_epoch, error)
 
-            # save_to_file(plot, 'retry{}.png'.format(retry_num))
+        save_to_file(plot, 'retry{}.png'.format(retry_num))
 
 
 def collapse_authors(authors: list):
@@ -162,8 +162,8 @@ def main():
     all_authors = dataset.all_authors
     authors = collapse_authors(all_authors)
     all_batches = generate_batches(dataset.methods_with_authors)
-    batches = all_batches[:1000]
-    test_set = all_batches[1000:1200]
+    batches = all_batches[:100]
+    test_set = all_batches[100:120]
     for train_retry in range(NUM_RETRY):
         train_step(train_retry, batches, test_set, authors)
 
