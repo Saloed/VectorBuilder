@@ -1,4 +1,5 @@
 import theano.tensor as T
+import theano.tensor.extra_ops
 from lasagne.updates import adadelta, nesterov_momentum
 from theano import function
 from lasagne.objectives import *
@@ -170,13 +171,12 @@ def build_net(nodes: Nodes, params: Params, pool_cutoff, authors_amount):
 
     dis_layer = FullConnected(params.b['b_dis'], activation=T.tanh,
                               name='discriminative', feature_amount=NUM_DISCRIMINATIVE)
-
     def softmax(x):
-        xdev = x - x.max(axis=0, keepdims=True)
-        return xdev - T.log(T.sum(T.exp(xdev), axis=0, keepdims=True))
+        e_x = T.exp(x - x.max(axis=0, keepdims=True))
+        return e_x / e_x.sum(axis=0, keepdims=True)
 
     out_layer = FullConnected(params.b['b_out'],  # activation=lambda x: x,
-                              softmax,  # T.nnet.softmax,   # not work (????)
+                             activation= softmax,  # T.nnet.softmax,   # not work (????)
                               name="softmax", feature_amount=authors_amount)
 
     Connection(pooling_layer, dis_layer, params.w['w_dis_top'])
@@ -240,6 +240,19 @@ def construct_network(nodes: Nodes, parameters: Params, mode: BuildMode, pool_cu
         # cost = -T.sum(target * net_forward, axis=0)
 
         # cost = -T.sum(target * logSoftmax(net_forward) + (1.0 - target) * T.log(1.0 + 1e-12 - softmax(net_forward)))
+
+        # hinge loss
+        cost = T.mean( T.nnet.relu(1 - target * net_forward))
+
+        # print(net_forward.eval())
+        # print(cost.eval({target:[-1,-1,-1,-1,1,-1,-1,-1]}))
+        # res = target.nonzero()
+        # corrects = net_forward[res]
+        # rest = theano.tensor.reshape(net_forward[(1 - target).nonzero()],
+        #                              (-1, author_amount - 1))
+        # rest = theano.tensor.max(rest, axis=1)
+        # # just tricky hack with [0] ??!!!??
+        # cost = theano.tensor.nnet.relu(rest - corrects + 1)[0]
 
         if mode == BuildMode.train:
             used_params = list(used_embeddings.values()) + list(parameters.b.values()) + list(parameters.w.values())

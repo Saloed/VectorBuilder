@@ -59,7 +59,8 @@ def build_vectors(authors):
     size = len(authors)
     for uauthor in authors:
         for author in uauthor[1]:
-            one_hot = np.zeros(size, dtype='int32')
+            one_hot = np.ones(size, dtype='int32')
+            one_hot *= -1
             one_hot[uauthor[0]] = 1
             index[author] = one_hot
     return index
@@ -130,14 +131,14 @@ def train_step(retry_num, batches, test_set, authors):
     nparams = init_params(authors)
     reset_batches(batches)
     reset_batches(test_set)
-    plot_axes, plot = new_figure(retry_num, NUM_EPOCH, 10.0)
+    # plot_axes, plot = new_figure(retry_num, NUM_EPOCH, 10.0)
     for train_epoch in range(NUM_EPOCH):
         error = epoch_step(nparams, train_epoch, retry_num, batches, test_set, authors)
         if error is None:
             return
-        update_figure(plot, plot_axes, train_epoch, error)
+            # update_figure(plot, plot_axes, train_epoch, error)
 
-    save_to_file(plot, 'retry{}.png'.format(retry_num))
+            # save_to_file(plot, 'retry{}.png'.format(retry_num))
 
 
 def collapse_authors(authors: list):
