@@ -1,15 +1,16 @@
 import _pickle as P
-from collections import namedtuple
-import numpy as np
 import gc
+import sys
+from copy import deepcopy
 from random import shuffle
 
+import numpy as np
 import theano
+from AuthorClassifier.ClassifierParams import NUM_RETRY, NUM_EPOCH
 
 from AST.GitAuthor import get_repo_methods_with_authors
-from TBCNN.Builder import construct_from_nodes
-from TBCNN.InitParams import init_params
-from TBCNN.NetworkParams import NUM_RETRY, NUM_EPOCH
+from AuthorClassifier.Builder import construct_from_nodes, BuildMode
+from AuthorClassifier.InitParams import init_params
 from Utils.Visualization import new_figure, update_figure, save_to_file
 from Utils.Wrappers import safe_run
 
@@ -74,13 +75,17 @@ def process_set(batches, nparams, need_back, authors):
         if need_back:
             if batch.back is None:
                 print('build {}'.format(i))
-                batch.back = construct_from_nodes(batch.ast, nparams, need_back, author_amount)
-            err += batch.back(author)
+                batch.back = construct_from_nodes(batch.ast, nparams, BuildMode.train, author_amount)
+            terr, res = batch.back(author)
+            print(batch.author, author, res, terr)
+            err += terr
         else:
             if batch.valid is None:
                 print('build {}'.format(i))
-                batch.valid = construct_from_nodes(batch.ast, nparams, need_back, author_amount)
-            err += batch.valid(author)
+                batch.valid = construct_from_nodes(batch.ast, nparams, BuildMode.validation, author_amount)
+            terr, res = batch.valid(author)
+            print(batch.author, author, res, terr)
+            err += terr
     return err / size
 
 
@@ -157,18 +162,50 @@ def collapse_authors(authors: list):
     return unique_authors
 
 
+def find_author(data, start_index, author, size) -> Batch:
+    for i in range(start_index, size):
+        if data[i] is not None:
+            if data[i].author == author:
+                result = deepcopy(data[i])
+                data[i] = None
+                return result
+    return None
+
+
+def divide_data_set(data_set):
+    data = deepcopy(data_set)
+    size = len(data)
+    result_set = []
+
+    for i in range(size):
+        if data[i] is not None:
+            author = data[i].author
+            test_pair = find_author(data, i + 1, author, size)
+            if test_pair is not None:
+                train_pair = deepcopy(data[i])
+                data[i] = None
+                result_set.append((train_pair, test_pair))
+    shuffle(result_set)
+    train_set = [pair[0] for pair in result_set]
+    test_set = [pair[1] for pair in result_set]
+
+    return train_set[:100], test_set[:20]
+
+
 def main():
     with open('../Dataset/author_file', 'rb') as f:
         dataset = P.load(f)
 
+    sys.setrecursionlimit(99999)
+
     all_authors = dataset.all_authors
     authors = collapse_authors(all_authors)
     all_batches = generate_batches(dataset.methods_with_authors)
-    shuffle(all_batches)
-    batches = all_batches[:500]
-    test_set = all_batches[500:600]
+
+    train_set, test_set = divide_data_set(all_batches)
+
     for train_retry in range(NUM_RETRY):
-        train_step(train_retry, batches, test_set, authors)
+        train_step(train_retry, train_set, test_set, authors)
 
 
 if __name__ == '__main__':

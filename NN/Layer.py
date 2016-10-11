@@ -5,7 +5,7 @@ import theano.compile
 import theano.tensor as T
 from theano.compile import SharedVariable as TS
 
-from TBCNN.NetworkParams import *
+from AuthorClassifier.ClassifierParams import *
 
 
 class Layer:
@@ -19,6 +19,12 @@ class Layer:
     @abstractmethod
     def build_forward(self):
         pass
+
+    def add_in_connection(self, con):
+        self.in_connection.append(con)
+
+    def add_out_coonection(self, con):
+        self.out_connection.append(con)
 
     def __str__(self):
         return self.name
@@ -78,9 +84,7 @@ class FullConnected(Layer):
     def build_forward(self):
         connections = [c.forward for c in self.in_connection]
         z = T.sum(connections, axis=0, acc_dtype=theano.config.floatX)
-        # print(z.ndim)
         self.forward = self.activation(T.add(z, self.bias))
-        # print(self.forward.ndim)
 
 
 class Pooling(Layer):
@@ -89,5 +93,4 @@ class Pooling(Layer):
 
     def build_forward(self):
         connections = [c.forward for c in self.in_connection]
-        # print(connections)
         self.forward = T.max(connections, axis=0)

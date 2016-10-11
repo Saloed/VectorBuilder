@@ -1,4 +1,4 @@
-from TBCNN.Layer import Layer
+from NN.Layer import Layer
 
 
 def print_layers(layers: list):

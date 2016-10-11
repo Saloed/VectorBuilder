@@ -3,7 +3,7 @@ from abc import abstractmethod
 import theano.tensor as T
 from theano.compile import SharedVariable as TS
 
-from TBCNN.Layer import Layer
+from NN.Layer import Layer
 
 
 class BaseConnection:
@@ -12,8 +12,8 @@ class BaseConnection:
         self.to_layer = to_layer
         self.forward = None
 
-        from_layer.out_connection.append(self)
-        to_layer.in_connection.append(self)
+        from_layer.add_out_coonection(self)
+        to_layer.add_in_connection(self)
 
     @abstractmethod
     def build_forward(self):

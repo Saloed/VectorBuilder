@@ -1,14 +1,12 @@
 from copy import deepcopy
 
-import numpy as np
-import theano.tensor as T
-from lasagne.updates import adadelta, nesterov_momentum, adam
+from lasagne.updates import adadelta
 from theano import function
 
-from Embeddings.Parameters import Parameters, MARGIN, LEARN_RATE
-from TBCNN.Builder import compute_leaf_num
-from TBCNN.Connection import Connection
-from TBCNN.Layer import *
+from AuthorClassifier.Builder import compute_leaf_num
+from Embeddings.Parameters import Parameters, MARGIN
+from NN.Connection import Connection
+from NN.Layer import *
 
 
 def compute_rates(tokens):

@@ -4,7 +4,7 @@ import _pickle as P
 from numpy.random import RandomState
 from theano import shared
 
-from TBCNN.NetworkParams import *
+from AuthorClassifier.ClassifierParams import *
 
 randomizer = RandomState(314)
 

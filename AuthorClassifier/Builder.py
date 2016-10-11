@@ -1,21 +1,19 @@
 import theano.tensor as T
-from lasagne.updates import adadelta
+from lasagne.updates import adadelta, nesterov_momentum
 from theano import function
-from theano.tensor.tests.mlp_test import LogisticRegression
-from lasagne import nonlinearities, objectives
-
+from lasagne.objectives import *
 from AST.Token import Token
 from AST.Tokenizer import Nodes, print_ast, visualize
-from TBCNN.Connection import Connection, PoolConnection
-from TBCNN.Layer import *
-from TBCNN.NetworkParams import *
+from NN.Connection import Connection, PoolConnection
+from NN.Layer import *
+from AuthorClassifier.ClassifierParams import *
 from enum import Enum
 
 
-# class NodeInfo(Enum):
-#     left = 'l'
-#     right = 'r'
-#     unknown = 'u'
+class BuildMode(Enum):
+    train = 'train'
+    validation = 'validation'
+    test = 'test'
 
 
 def compute_rates(root_node: Token):
@@ -31,7 +29,7 @@ def compute_rates(root_node: Token):
             compute_rates(child)
 
 
-def construct_from_nodes(ast: Nodes, parameters: Params, need_back_prop, author_amount):
+def construct_from_nodes(ast: Nodes, parameters: Params, mode: BuildMode, author_amount):
     # visualize(ast.root_node, 'ast.png')
     nodes = ast.all_nodes
     compute_rates(ast.root_node)
@@ -39,7 +37,7 @@ def construct_from_nodes(ast: Nodes, parameters: Params, need_back_prop, author_
     avg_depth *= .6
     if avg_depth < 1:        avg_depth = 1
 
-    return construct_network(ast, parameters, need_back_prop, avg_depth, author_amount)
+    return construct_network(ast, parameters, mode, avg_depth, author_amount)
 
 
 def compute_leaf_num(root, nodes, depth=0):
@@ -104,7 +102,7 @@ ConvolveParams = namedtuple('ConvolveParams',
 #                 child_info = 'right'
 #         convolve_creator(child, child_info, conv_layers, depth + 1, cp)
 
-
+# one way pooling (applied now)
 def convolve_creator(root_node, pooling_layer, conv_layers, layers, params):
     child_len = len(root_node.children)
     if child_len == 0: return
@@ -173,11 +171,12 @@ def build_net(nodes: Nodes, params: Params, pool_cutoff, authors_amount):
     dis_layer = FullConnected(params.b['b_dis'], activation=T.tanh,
                               name='discriminative', feature_amount=NUM_DISCRIMINATIVE)
 
-    def softmax(z):
-        e_z = T.exp(z - z.max(axis=0, keepdims=True))
-        return e_z / e_z.sum(axis=0, keepdims=True)
+    def softmax(x):
+        xdev = x - x.max(axis=0, keepdims=True)
+        return xdev - T.log(T.sum(T.exp(xdev), axis=0, keepdims=True))
 
-    out_layer = FullConnected(params.b['b_out'], activation=softmax,  # T.nnet.softmax,   # not work (????)
+    out_layer = FullConnected(params.b['b_out'],  # activation=lambda x: x,
+                              softmax,  # T.nnet.softmax,   # not work (????)
                               name="softmax", feature_amount=authors_amount)
 
     Connection(pooling_layer, dis_layer, params.w['w_dis_top'])
@@ -201,7 +200,14 @@ def build_net(nodes: Nodes, params: Params, pool_cutoff, authors_amount):
     return layers, used_embeddings
 
 
-def construct_network(nodes: Nodes, parameters: Params, need_back_prop: bool, pool_cutoff, author_amount):
+# # numerically stable log-softmax with crossentropy
+# xdev = x-x.max(1,keepdims=True)
+# lsm = xdev - T.log(T.sum(T.exp(xdev),axis=1,keepdims=True))
+# sm2 = T.exp(lsm) # just used to show equivalence with sm
+# cm2=-T.sum(y*lsm,axis=1)
+# g2 = T.grad(cm2.mean(),x)
+
+def construct_network(nodes: Nodes, parameters: Params, mode: BuildMode, pool_cutoff, author_amount):
     net, used_embeddings = build_net(nodes, parameters, pool_cutoff, author_amount)
 
     # print(pool_cutoff)
@@ -214,23 +220,40 @@ def construct_network(nodes: Nodes, parameters: Params, need_back_prop: bool, po
                     c.build_forward()
             layer.build_forward()
 
+    # def logSoftmax(x):
+    #     xdev = x - x.max(axis=0, keepdims=True)
+    #     return xdev - T.log(T.sum(T.exp(xdev), axis=0, keepdims=True))
+    #
+    # def softmax(x):
+    #     e_x = T.exp(x - x.max(axis=0, keepdims=True))
+    #     return e_x / e_x.sum(axis=0, keepdims=True)
+
     def back_propagation(net_forward):
         target = T.ivector('target')
-        # T.nnet.categorical_crossentropy()
-        # print(target.ndim)
-        # print(net_forward.ndim)
-        # print(net_forward)
-        # print(net_forward.eval())
-        cost = -T.sum(target * T.log(net_forward), axis=0)
 
-        if need_back_prop:
+        # cost = -T.sum(target * T.log(net_forward), axis=0)
+
+        # cost = T.std(net_forward - target)
+
+        # cost = -T.mean(target * T.log(net_forward) + (1.0 - target) * T.log(1.0 - net_forward))
+
+        # cost = -T.sum(target * net_forward, axis=0)
+
+        # cost = -T.sum(target * logSoftmax(net_forward) + (1.0 - target) * T.log(1.0 + 1e-12 - softmax(net_forward)))
+
+        if mode == BuildMode.train:
             used_params = list(used_embeddings.values()) + list(parameters.b.values()) + list(parameters.w.values())
-            updates = adadelta(cost, used_params)
-            return function([target], cost, updates=updates)
+
+            updates = nesterov_momentum(cost, used_params, 0.2)
+
+            return function([target], [cost, net_forward], updates=updates)
         else:
-            return function([target], cost)
+            return function([target], [cost, net_forward])
 
     f_builder(net[-1])
 
     net_forward = net[-1].forward
-    return back_propagation(net_forward)
+    if mode == BuildMode.train or mode == BuildMode.validation:
+        return back_propagation(net_forward)
+    else:
+        return function([], net_forward)
