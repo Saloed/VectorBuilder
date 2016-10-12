@@ -1,8 +1,10 @@
 import _pickle as P
 import gc
 import sys
+from collections import namedtuple
 from copy import deepcopy
-from random import shuffle
+from itertools import groupby
+from random import shuffle, choice
 
 import numpy as np
 import theano
@@ -59,8 +61,9 @@ def build_vectors(authors):
     size = len(authors)
     for uauthor in authors:
         for author in uauthor[1]:
-            one_hot = np.ones(size, dtype='int32')
-            one_hot *= -1
+            # one_hot = np.ones(size, dtype='int32')
+            # one_hot *= -1
+            one_hot = np.zeros(size, dtype='int32')
             one_hot[uauthor[0]] = 1
             index[author] = one_hot
     return index
@@ -75,17 +78,17 @@ def process_set(batches, nparams, need_back, authors):
         author = reverse_index[batch.author]
         if need_back:
             if batch.back is None:
-                print('build {}'.format(i))
+                fprint(['build {}'.format(i)])
                 batch.back = construct_from_nodes(batch.ast, nparams, BuildMode.train, author_amount)
             terr, res = batch.back(author)
-            print(batch.author, author, res, terr)
+            fprint([batch.author, author, res, terr])
             err += terr
         else:
             if batch.valid is None:
-                print('build {}'.format(i))
+                fprint(['build {}'.format(i)])
                 batch.valid = construct_from_nodes(batch.ast, nparams, BuildMode.validation, author_amount)
             terr, res = batch.valid(author)
-            print(batch.author, author, res, terr)
+            fprint([batch.author, author, res, terr])
             err += terr
     return err / size
 
@@ -112,9 +115,9 @@ def epoch_step(nparams, train_epoch, retry_num, batches, test_set, authors):
     ]
     fprint(print_str, log_file)
 
-    if train_epoch % 100 == 0:
-        with open('NewParams/new_params_t' + str(retry_num) + "_ep" + str(train_epoch), mode='wb') as new_params:
-            P.dump(nparams, new_params)
+    # if train_epoch % 100 == 0:
+    with open('NewParams/new_params_t' + str(retry_num) + "_ep" + str(train_epoch), mode='wb') as new_params:
+        P.dump(nparams, new_params)
 
     return test_err
 
@@ -131,14 +134,14 @@ def train_step(retry_num, batches, test_set, authors):
     nparams = init_params(authors)
     reset_batches(batches)
     reset_batches(test_set)
-    # plot_axes, plot = new_figure(retry_num, NUM_EPOCH, 10.0)
+    plot_axes, plot = new_figure(retry_num, NUM_EPOCH, 8)
     for train_epoch in range(NUM_EPOCH):
         error = epoch_step(nparams, train_epoch, retry_num, batches, test_set, authors)
         if error is None:
             return
-            # update_figure(plot, plot_axes, train_epoch, error)
+        update_figure(plot, plot_axes, train_epoch, error)
 
-            # save_to_file(plot, 'retry{}.png'.format(retry_num))
+    save_to_file(plot, 'retry{}.png'.format(retry_num))
 
 
 def collapse_authors(authors: list):
@@ -160,20 +163,39 @@ def collapse_authors(authors: list):
     for a in authors:
         if search_for_new(a):
             unique_authors.append((len(unique_authors), [a]))
-    return unique_authors
+    revers_index = {}
+    for ua in unique_authors:
+        index = ua[0]
+        for a in ua[1]:
+            revers_index[a] = index
+    return unique_authors, revers_index
 
 
-def find_author(data, start_index, author, size) -> Batch:
+def find_author(data, start_index, author_index, r_index, size) -> Batch:
     for i in range(start_index, size):
         if data[i] is not None:
-            if data[i].author == author:
+            if r_index[data[i].author] == author_index:
                 result = deepcopy(data[i])
                 data[i] = None
                 return result
     return None
 
 
-def divide_data_set(data_set):
+TrainUnit = namedtuple('TrainUnit', ['train', 'test', 'author', 'index'])
+
+
+def pick_unique_authors(data, samples_number):
+    groups = {}
+    for k, g in groupby(data, lambda x: x.index):
+        groups[k] = list(g)
+    result_set = []
+    for i in range(samples_number):
+        for k, itm in groups.items():
+            result_set.append(choice(itm))
+    return result_set
+
+
+def divide_data_set(data_set, r_index):
     data = deepcopy(data_set)
     size = len(data)
     result_set = []
@@ -181,16 +203,17 @@ def divide_data_set(data_set):
     for i in range(size):
         if data[i] is not None:
             author = data[i].author
-            test_pair = find_author(data, i + 1, author, size)
+            index = r_index[author]
+            test_pair = find_author(data, i + 1, index, r_index, size)
             if test_pair is not None:
                 train_pair = deepcopy(data[i])
                 data[i] = None
-                result_set.append((train_pair, test_pair))
-    shuffle(result_set)
-    train_set = [pair[0] for pair in result_set]
-    test_set = [pair[1] for pair in result_set]
+                result_set.append(TrainUnit(train_pair, test_pair, author, index))
+    result_set = pick_unique_authors(result_set, 30)
+    train_set = [unit.train for unit in result_set]
+    test_set = [unit.test for unit in result_set]
 
-    return train_set[:100], test_set[:20]
+    return train_set[:300], test_set[:100]
 
 
 def main():
@@ -200,11 +223,10 @@ def main():
     sys.setrecursionlimit(99999)
 
     all_authors = dataset.all_authors
-    authors = collapse_authors(all_authors)
+    authors, r_index = collapse_authors(all_authors)
     all_batches = generate_batches(dataset.methods_with_authors)
 
-    train_set, test_set = divide_data_set(all_batches)
-
+    train_set, test_set = divide_data_set(all_batches, r_index)
     for train_retry in range(NUM_RETRY):
         train_step(train_retry, train_set, test_set, authors)
 
