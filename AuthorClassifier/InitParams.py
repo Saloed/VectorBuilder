@@ -1,7 +1,8 @@
 import numpy as np
 import theano
 import _pickle as P
-from numpy.random import RandomState
+
+from numpy.random.mtrand import RandomState
 from theano import shared
 
 from AuthorClassifier.ClassifierParams import *
@@ -21,8 +22,8 @@ def rand_bias(shape, name):
     return shared(bias, name)
 
 
-def init_params(all_authors):
-    with open('emb_params', 'rb') as p_file:
+def init_params(all_authors, emb_path):
+    with open(emb_path, 'rb') as p_file:
         e_params = P.load(p_file)
     out_features = len(all_authors)
     embeddings = e_params.embeddings

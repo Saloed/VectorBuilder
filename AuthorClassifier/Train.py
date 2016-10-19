@@ -4,10 +4,12 @@ import sys
 from collections import namedtuple
 from copy import deepcopy
 from itertools import groupby
-from random import shuffle, choice
+from random import randint, shuffle
 
 import numpy as np
 import theano
+
+from AST.Tokenizer import print_ast
 from AuthorClassifier.ClassifierParams import NUM_RETRY, NUM_EPOCH
 
 from AST.GitAuthor import get_repo_methods_with_authors
@@ -29,21 +31,22 @@ def generate_author_file():
 
 
 class Batch:
-    def __init__(self, ast, author):
+    def __init__(self, ast, author, index):
         self.ast = ast
         self.author = author
+        self.index = index
         self.valid = None
         self.back = None
 
     def __str__(self):
-        return '{} {}'.format(str(self.author), str(self.ast.root_node))
+        return '{} {} {}'.format(self.index, str(self.author), str(self.ast.root_node))
 
     def __repr__(self):
         return self.__str__()
 
 
-def generate_batches(data: list) -> list:
-    return [Batch(d, d.root_node.author) for d in data]
+def generate_batches(data: list, r_index) -> list:
+    return [Batch(d, d.root_node.author, r_index[d.root_node.author]) for d in data]
 
 
 log_file = open('log.txt', mode='w')
@@ -93,7 +96,7 @@ def process_set(batches, nparams, need_back, authors):
     return err / size
 
 
-@safe_run
+# @safe_run
 def epoch_step(nparams, train_epoch, retry_num, batches, test_set, authors):
     shuffle(batches)
     fprint(['train set'])
@@ -115,11 +118,11 @@ def epoch_step(nparams, train_epoch, retry_num, batches, test_set, authors):
     ]
     fprint(print_str, log_file)
 
-    # if train_epoch % 100 == 0:
-    with open('NewParams/new_params_t' + str(retry_num) + "_ep" + str(train_epoch), mode='wb') as new_params:
-        P.dump(nparams, new_params)
+    if train_epoch % 100 == 0:
+        with open('NewParams/new_params_t' + str(retry_num) + "_ep" + str(train_epoch), mode='wb') as new_params:
+            P.dump(nparams, new_params)
 
-    return test_err
+    return test_err, tr_err
 
 
 def reset_batches(batches):
@@ -129,17 +132,18 @@ def reset_batches(batches):
     gc.collect()
 
 
-@safe_run
+# @safe_run
 def train_step(retry_num, batches, test_set, authors):
-    nparams = init_params(authors)
+    nparams = init_params(authors, 'emb_params')
     reset_batches(batches)
     reset_batches(test_set)
-    plot_axes, plot = new_figure(retry_num, NUM_EPOCH, 8)
+    plot_axes, plot = new_figure(retry_num, NUM_EPOCH, 1.2)  # len(authors) + 1)
     for train_epoch in range(NUM_EPOCH):
         error = epoch_step(nparams, train_epoch, retry_num, batches, test_set, authors)
         if error is None:
             return
-        update_figure(plot, plot_axes, train_epoch, error)
+        verr, terr = error
+        update_figure(plot, plot_axes, train_epoch, verr, terr)
 
     save_to_file(plot, 'retry{}.png'.format(retry_num))
 
@@ -171,49 +175,58 @@ def collapse_authors(authors: list):
     return unique_authors, revers_index
 
 
-def find_author(data, start_index, author_index, r_index, size) -> Batch:
-    for i in range(start_index, size):
-        if data[i] is not None:
-            if r_index[data[i].author] == author_index:
-                result = deepcopy(data[i])
-                data[i] = None
-                return result
-    return None
+def group_batches(data, r_index, authors):
+    indexed = {}
+    for d in data:
+        if d.index not in indexed:
+            indexed[d.index] = []
+        indexed[d.index].append(d)
+
+    for k in indexed.keys():
+        batches = indexed[k]
+        if len(batches) < 700:
+            for b in batches:
+                if b.author in r_index:
+                    r_index[b.author] = None
+            indexed[k] = None
+
+    index = 0
+    new_index = {}
+    for k, itm in indexed.items():
+        if itm is not None:
+            for i in itm:
+                i.index = index
+                r_index[i.author] = index
+            new_index[index] = itm
+            index += 1
+    r_index = {k: v for k, v in r_index.items() if v is not None}
+    authors = {}
+    for k, v in r_index.items():
+        if v not in authors:
+            authors[v] = []
+        authors[v].append(k)
+    authors = [(k, v) for k, v in authors.items()]
+    return new_index, r_index, authors
 
 
-TrainUnit = namedtuple('TrainUnit', ['train', 'test', 'author', 'index'])
+def divide_data_set(data_set, train_units, test_units):
+    train_set = []
+    test_set = []
 
+    for i in range(train_units):
+        for k, itm in data_set.items():
+            size = len(itm)
+            if i > size - test_units:
+                pos = randint(0, size - test_units)
+                train_set.append(itm[pos])
+            else:
+                train_set.append(itm[i])
 
-def pick_unique_authors(data, samples_number):
-    groups = {}
-    for k, g in groupby(data, lambda x: x.index):
-        groups[k] = list(g)
-    result_set = []
-    for i in range(samples_number):
-        for k, itm in groups.items():
-            result_set.append(choice(itm))
-    return result_set
+    for i in range(test_units):
+        for k, itm in data_set.items():
+            test_set.append(itm[len(itm) - 1 - i])
 
-
-def divide_data_set(data_set, r_index):
-    data = deepcopy(data_set)
-    size = len(data)
-    result_set = []
-
-    for i in range(size):
-        if data[i] is not None:
-            author = data[i].author
-            index = r_index[author]
-            test_pair = find_author(data, i + 1, index, r_index, size)
-            if test_pair is not None:
-                train_pair = deepcopy(data[i])
-                data[i] = None
-                result_set.append(TrainUnit(train_pair, test_pair, author, index))
-    result_set = pick_unique_authors(result_set, 30)
-    train_set = [unit.train for unit in result_set]
-    test_set = [unit.test for unit in result_set]
-
-    return train_set[:300], test_set[:100]
+    return train_set, test_set
 
 
 def main():
@@ -224,9 +237,10 @@ def main():
 
     all_authors = dataset.all_authors
     authors, r_index = collapse_authors(all_authors)
-    all_batches = generate_batches(dataset.methods_with_authors)
+    all_batches = generate_batches(dataset.methods_with_authors, r_index)
+    batches, r_index, authors = group_batches(all_batches, r_index, authors)
+    train_set, test_set = divide_data_set(batches, 100, 20)
 
-    train_set, test_set = divide_data_set(all_batches, r_index)
     for train_retry in range(NUM_RETRY):
         train_step(train_retry, train_set, test_set, authors)
 

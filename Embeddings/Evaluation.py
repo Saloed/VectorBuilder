@@ -4,8 +4,6 @@ import numpy as np
 from AST.Sampler import PreparedAST
 from AST.Token import Token
 from Embeddings.Parameters import *
-from NN.NetworkParams import Network
-from Utils.Wrappers import timing
 
 
 class EvaluationSet:

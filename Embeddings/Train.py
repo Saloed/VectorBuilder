@@ -1,4 +1,5 @@
 import _pickle as c_pickle
+import os
 from random import shuffle
 import theano
 from AST.Sampler import PreparedAST, generate_samples, build_asts
@@ -171,4 +172,4 @@ def main():
 if __name__ == '__main__':
     gc.enable()
     main()
-    build_asts('../Dataset/java_files/')
+    # build_asts('../Dataset/java_files/')
