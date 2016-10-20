@@ -5,7 +5,7 @@ from collections import namedtuple
 from copy import deepcopy
 from itertools import groupby
 from random import randint, shuffle
-
+import math
 import numpy as np
 import theano
 
@@ -93,10 +93,12 @@ def process_set(batches, nparams, need_back, authors):
             terr, e, res = batch.valid(author)
             fprint([batch.author, author, res, terr, e])
             err += terr
+        if math.isnan(terr):
+            raise Exception('Error is NAN. Start new retry')
     return err / size
 
 
-# @safe_run
+@safe_run
 def epoch_step(nparams, train_epoch, retry_num, batches, test_set, authors):
     shuffle(batches)
     fprint(['train set'])
@@ -132,7 +134,7 @@ def reset_batches(batches):
     gc.collect()
 
 
-# @safe_run
+@safe_run
 def train_step(retry_num, batches, test_set, authors):
     nparams = init_params(authors, 'emb_params')
     reset_batches(batches)
