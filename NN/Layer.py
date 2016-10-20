@@ -87,6 +87,22 @@ class FullConnected(Layer):
         self.forward = self.activation(T.add(z, self.bias))
 
 
+class RBF_SVM(Layer):
+    def __init__(self, bias: TS, w: TS, c: TS, s: TS, feature_amount, name='SVM'):
+        super().__init__(name, feature_amount)
+        self.bias = bias
+        self.w = w
+        self.c = c
+        self.s = s
+
+    def build_forward(self):
+        # assunming that only one in coneection exist
+        x = self.in_connection[0].forward
+        difnorm = T.sum((self.c - x) ** 2, axis=-1)
+        kernel = T.exp(-difnorm * (self.s ** 2))
+        self.forward = T.nnet.sigmoid(T.dot(kernel, self.w) + self.bias)
+
+
 class Pooling(Layer):
     def __init__(self, name, feature_amount=NUM_CONVOLUTION):
         super().__init__(name, feature_amount)

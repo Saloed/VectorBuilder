@@ -33,7 +33,7 @@ class Params:
                  w_dis_top, w_dis_left, w_dis_right,
                  w_out,
                  b_construct,
-                 b_conv, b_dis, b_out,
+                 b_conv, b_dis, b_out, c_out, s_out,
                  embeddings):
         self.w = {
             'w_left': w_left,
@@ -57,6 +57,8 @@ class Params:
 
             'b_conv': b_conv,
             'b_dis': b_dis,
-            'b_out': b_out
+            'b_out': b_out,
+            'c_out': c_out,
+            's_out': s_out
         }
         self.embeddings = embeddings

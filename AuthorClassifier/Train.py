@@ -64,9 +64,9 @@ def build_vectors(authors):
     size = len(authors)
     for uauthor in authors:
         for author in uauthor[1]:
-            # one_hot = np.ones(size, dtype='int32')
-            # one_hot *= -1
-            one_hot = np.zeros(size, dtype='int32')
+            # one_hot = np.ones(size, dtype='float32')
+            # one_hot *= -1.0
+            one_hot = np.zeros(size, dtype='float32')
             one_hot[uauthor[0]] = 1
             index[author] = one_hot
     return index
@@ -83,15 +83,15 @@ def process_set(batches, nparams, need_back, authors):
             if batch.back is None:
                 fprint(['build {}'.format(i)])
                 batch.back = construct_from_nodes(batch.ast, nparams, BuildMode.train, author_amount)
-            terr, res = batch.back(author)
-            fprint([batch.author, author, res, terr])
+            terr, e, res = batch.back(author)
+            fprint([batch.author, author, res, terr, e])
             err += terr
         else:
             if batch.valid is None:
                 fprint(['build {}'.format(i)])
                 batch.valid = construct_from_nodes(batch.ast, nparams, BuildMode.validation, author_amount)
-            terr, res = batch.valid(author)
-            fprint([batch.author, author, res, terr])
+            terr, e, res = batch.valid(author)
+            fprint([batch.author, author, res, terr, e])
             err += terr
     return err / size
 
@@ -137,7 +137,7 @@ def train_step(retry_num, batches, test_set, authors):
     nparams = init_params(authors, 'emb_params')
     reset_batches(batches)
     reset_batches(test_set)
-    plot_axes, plot = new_figure(retry_num, NUM_EPOCH, 1.2)  # len(authors) + 1)
+    plot_axes, plot = new_figure(retry_num, NUM_EPOCH, 4)  # len(authors) + 1)
     for train_epoch in range(NUM_EPOCH):
         error = epoch_step(nparams, train_epoch, retry_num, batches, test_set, authors)
         if error is None:
