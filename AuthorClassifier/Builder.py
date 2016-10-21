@@ -187,7 +187,8 @@ def build_net(nodes: Nodes, params: Params, pool_cutoff, authors_amount):
     #                           name="softmax", feature_amount=authors_amount)
     Connection(pooling_layer, dis_layer, params.w['w_dis_top'])
 
-    out_layer = RBF_SVM(params.b['b_out'], params.w['w_out'], params.b['c_out'], params.b['s_out'], authors_amount)
+    out_layer = RBF_SVM(params.svm['b_out'], params.svm['w_out'], params.svm['c_out'], params.svm['s_out'],
+                        authors_amount)
 
     # because need just pass forward of diss layer to svm
     PoolConnection(dis_layer, out_layer)
@@ -195,7 +196,6 @@ def build_net(nodes: Nodes, params: Params, pool_cutoff, authors_amount):
     # Connection(pool_top, dis_layer, params.w['w_dis_top'])
     # Connection(pool_left, dis_layer, params.w['w_dis_left'])
     # Connection(pool_right, dis_layer, params.w['w_dis_right'])
-
 
     layers = _layers + conv_layers
 
@@ -283,10 +283,14 @@ def construct_network(nodes: Nodes, parameters: Params, mode: BuildMode, pool_cu
 
         if mode == BuildMode.train:
             used_params = list(used_embeddings.values()) + list(parameters.b.values()) + list(parameters.w.values())
+            svm_params = list(parameters.svm.values())
 
             updates = adadelta(cost, used_params)
+            svm_updates = adadelta(cost, svm_params)
 
-            return function([target], [cost, error, net_forward], updates=updates)
+            return function([target], [cost, error, net_forward], updates=updates), function([target],
+                                                                                             [cost, error, net_forward],
+                                                                                             updates=svm_updates)
         else:
             return function([target], [cost, error, net_forward])
 

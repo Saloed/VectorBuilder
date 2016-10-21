@@ -37,6 +37,7 @@ class Batch:
         self.index = index
         self.valid = None
         self.back = None
+        self.back_svm = None
 
     def __str__(self):
         return '{} {} {}'.format(self.index, str(self.author), str(self.ast.root_node))
@@ -80,10 +81,13 @@ def process_set(batches, nparams, need_back, authors):
     for i, batch in enumerate(batches):
         author = reverse_index[batch.author]
         if need_back:
-            if batch.back is None:
+            if batch.back is None or batch.back_svm is None:
                 fprint(['build {}'.format(i)])
-                batch.back = construct_from_nodes(batch.ast, nparams, BuildMode.train, author_amount)
-            terr, e, res = batch.back(author)
+                batch.back, batch.back_svm = construct_from_nodes(batch.ast, nparams, BuildMode.train, author_amount)
+            if i < 0.7 * size:
+                terr, e, res = batch.back(author)
+            else:
+                terr, e, res = batch.back_svm(author)
             fprint([batch.author, author, res, terr, e])
             err += terr
         else:
@@ -130,6 +134,7 @@ def epoch_step(nparams, train_epoch, retry_num, batches, test_set, authors):
 def reset_batches(batches):
     for batch in batches:
         batch.back = None
+        batch.back_svm = None
         batch.valid = None
     gc.collect()
 
@@ -231,6 +236,42 @@ def divide_data_set(data_set, train_units, test_units):
     return train_set, test_set
 
 
+def test():
+    with open('../Dataset/author_file', 'rb') as f:
+        dataset = P.load(f)
+
+    sys.setrecursionlimit(99999)
+
+    all_authors = dataset.all_authors
+    authors, r_index = collapse_authors(all_authors)
+    all_batches = generate_batches(dataset.methods_with_authors, r_index)
+    batches, r_index, authors = group_batches(all_batches, r_index, authors)
+    train_set, test_set = divide_data_set(batches, 100, 200)
+    batches = train_set + test_set
+
+    with open('test_params', 'rb') as f:
+        nparams = P.load(f)
+
+    err = 0
+    author_err = 0
+    size = len(batches)
+    author_amount = len(authors)
+    reverse_index = build_vectors(authors)
+
+    for i, batch in enumerate(batches):
+        author = reverse_index[batch.author]
+        fprint(['build {}'.format(i)])
+        batch.valid = construct_from_nodes(batch.ast, nparams, BuildMode.validation, author_amount)
+        terr, e, res = batch.valid(author)
+        author_err += e
+        fprint([batch.author, author, res, terr, e])
+        err += terr
+        if math.isnan(terr):
+            raise Exception('Error is NAN. Start new retry')
+    print('author recognition error {} {}\nmean cross entropy {} {}'.format(author_err, author_err / size, err,
+                                                                            err / size))
+
+
 def main():
     with open('../Dataset/author_file', 'rb') as f:
         dataset = P.load(f)
@@ -250,3 +291,4 @@ def main():
 if __name__ == '__main__':
     main()
     # generate_author_file()
+    # test()

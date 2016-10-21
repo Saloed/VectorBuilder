@@ -50,15 +50,19 @@ class Params:
             # 'w_dis_left': w_dis_left,
             # 'w_dis_right': w_dis_right,
 
-            'w_out': w_out
         }
         self.b = {
             'b_construct': b_construct,
 
             'b_conv': b_conv,
             'b_dis': b_dis,
+
+        }
+        self.svm = {
+            'w_out': w_out,
             'b_out': b_out,
             'c_out': c_out,
             's_out': s_out
+
         }
         self.embeddings = embeddings
