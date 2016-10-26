@@ -10,17 +10,17 @@ learn_rate = 0.0025  # 0.0001
 beta = .0001
 momentum = 0.1
 
-NUM_CONVOLUTION = 600  # 50
-NUM_DISCRIMINATIVE = 300  # 50
-NUM_OUT_LAYER = 104
+NUM_CONVOLUTION = 60  # 50
+NUM_DISCRIMINATIVE = 30  # 50
+NUM_OUT_LAYER = 10
 NUM_POOLING = 3
 
 BATCH_SIZE = 1
 
-RANDOM_RANGE = 0.2
+RANDOM_RANGE = 0.02
 
 NUM_RETRY = 200
-NUM_EPOCH = 4000
+NUM_EPOCH = 1000
 
 Network = namedtuple('Network', ['forward', 'back', 'validation'])
 
@@ -46,7 +46,7 @@ class Params:
             'w_conv_left': w_conv_left,
             'w_conv_right': w_conv_right,
 
-            'w_dis_top': w_dis_top,
+            # 'w_dis_top': w_dis_top,
             # 'w_dis_left': w_dis_left,
             # 'w_dis_right': w_dis_right,
 
@@ -55,14 +55,14 @@ class Params:
             'b_construct': b_construct,
 
             'b_conv': b_conv,
-            'b_dis': b_dis,
+            # 'b_dis': b_dis,
 
         }
         self.svm = {
             'w_out': w_out,
             'b_out': b_out,
-            'c_out': c_out,
-            's_out': s_out
+            # 'c_out': c_out,
+            # 's_out': s_out
 
         }
         self.embeddings = embeddings

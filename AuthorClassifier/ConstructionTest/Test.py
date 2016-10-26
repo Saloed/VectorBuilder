@@ -2,7 +2,7 @@ import _pickle as P
 
 from AST.Tokenizer import parser_init, build_ast, divide_by_methods, get_all_available_tokens, visualize
 from AuthorClassifier.Builder import BuildMode
-from AuthorClassifier.ConstructionTest.Builder import construct_from_nodes
+from AuthorClassifier.Builder import construct_from_nodes
 from AuthorClassifier.InitParams import init_params
 
 

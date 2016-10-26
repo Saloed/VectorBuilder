@@ -65,9 +65,9 @@ def build_vectors(authors):
     size = len(authors)
     for uauthor in authors:
         for author in uauthor[1]:
-            # one_hot = np.ones(size, dtype='float32')
-            # one_hot *= -1.0
-            one_hot = np.zeros(size, dtype='float32')
+            one_hot = np.ones(size, dtype='float32')
+            one_hot *= -1.0
+            # one_hot = np.zeros(size, dtype='float32')
             one_hot[uauthor[0]] = 1
             index[author] = one_hot
     return index
@@ -85,18 +85,19 @@ def process_set(batches, nparams, need_back, authors):
                 fprint(['build {}'.format(i)])
                 batch.back, batch.back_svm = construct_from_nodes(batch.ast, nparams, BuildMode.train, author_amount)
             if i < 0.7 * size:
-                terr, e, res = batch.back(author)
+                terr, e, res, net_out = batch.back(author)
             else:
-                terr, e, res = batch.back_svm(author)
-            fprint([batch.author, author, res, terr, e])
+                terr, e, res, net_out = batch.back_svm(author)
+            fprint([batch.author, author, res, terr, e, net_out])
             err += terr
         else:
             if batch.valid is None:
                 fprint(['build {}'.format(i)])
                 batch.valid = construct_from_nodes(batch.ast, nparams, BuildMode.validation, author_amount)
-            terr, e, res = batch.valid(author)
-            fprint([batch.author, author, res, terr, e])
+            terr, e, res, net_out = batch.valid(author)
+            fprint([batch.author, author, res, terr, e, net_out])
             err += terr
+        # fprint([nparams.w['w_conv_root'].eval(), nparams.b['b_conv'].eval()])
         if math.isnan(terr):
             raise Exception('Error is NAN. Start new retry')
     return err / size
@@ -277,12 +278,13 @@ def main():
         dataset = P.load(f)
 
     sys.setrecursionlimit(99999)
+    np.set_printoptions(threshold=100000)
 
     all_authors = dataset.all_authors
     authors, r_index = collapse_authors(all_authors)
     all_batches = generate_batches(dataset.methods_with_authors, r_index)
     batches, r_index, authors = group_batches(all_batches, r_index, authors)
-    train_set, test_set = divide_data_set(batches, 100, 20)
+    train_set, test_set = divide_data_set(batches, 20, 5)
 
     for train_retry in range(NUM_RETRY):
         train_step(train_retry, train_set, test_set, authors)

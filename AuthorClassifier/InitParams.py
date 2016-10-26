@@ -48,15 +48,15 @@ def init_params(all_authors, emb_path):
     w_dis_left = rand_weight(NUM_DISCRIMINATIVE, NUM_CONVOLUTION, 'w_dis_left')
     w_dis_right = rand_weight(NUM_DISCRIMINATIVE, NUM_CONVOLUTION, 'w_dis_right')
 
-    w_out = rand_weight(NUM_DISCRIMINATIVE, out_features, 'w_out')
+    w_out = rand_weight(out_features, NUM_CONVOLUTION, 'w_out')
 
     b_conv = rand_bias(NUM_CONVOLUTION, 'b_conv')
 
     b_dis = rand_bias(NUM_DISCRIMINATIVE, 'b_dis')
 
     b_out = rand_bias(out_features, 'b_out')
-    c_out = rand_bias(NUM_DISCRIMINATIVE, 'c_out')
-    s_out = rand_bias(NUM_DISCRIMINATIVE, 's_out')
+    c_out = rand_bias(NUM_CONVOLUTION, 'c_out')
+    s_out = rand_bias(NUM_CONVOLUTION, 's_out')
 
     return Params(w_left, w_right,
                   w_comb_ae, w_comb_emb,

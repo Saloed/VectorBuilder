@@ -1,15 +1,15 @@
 import theano.tensor as T
 import theano.tensor.extra_ops
-from lasagne.updates import adadelta, nesterov_momentum
+from lasagne.updates import adadelta, nesterov_momentum, sgd, adam
 from theano import function
 from lasagne.objectives import *
 from theano.printing import pydotprint
-
 from AST.Token import Token
 from AST.Tokenizer import Nodes, print_ast, visualize
 from NN.Connection import Connection, PoolConnection
 from NN.Layer import *
 from AuthorClassifier.ClassifierParams import *
+from theano.compile.nanguardmode import NanGuardMode
 from enum import Enum
 
 
@@ -171,8 +171,8 @@ def build_net(nodes: Nodes, params: Params, pool_cutoff, authors_amount):
     pooling_layer = Pooling('pool', NUM_CONVOLUTION)
     convolve_creator(nodes.root_node, pooling_layer, conv_layers, _layers, params)
 
-    dis_layer = FullConnected(params.b['b_dis'], activation=T.tanh,
-                              name='discriminative', feature_amount=NUM_DISCRIMINATIVE)
+    # dis_layer = FullConnected(params.b['b_dis'], activation=T.tanh,
+    #                           name='discriminative', feature_amount=NUM_DISCRIMINATIVE)
     #
     # def softmax(x):
     #     e_x = T.exp(x - x.max(axis=0, keepdims=True))
@@ -185,13 +185,19 @@ def build_net(nodes: Nodes, params: Params, pool_cutoff, authors_amount):
     # out_layer = FullConnected(params.b['b_out'],  # activation=lambda x: x,
     #                           activation=softmax,  # activation=logSoftmax,  # T.nnet.softmax,   # not work (????)
     #                           name="softmax", feature_amount=authors_amount)
-    Connection(pooling_layer, dis_layer, params.w['w_dis_top'])
+    # Connection(pooling_layer, dis_layer, params.w['w_dis_top'])
+    #
+    # out_layer = RBF_SVM(params.svm['b_out'], params.svm['w_out'],
+    #                     # params.svm['c_out'], params.svm['s_out'],
+    #                     authors_amount)
 
-    out_layer = RBF_SVM(params.svm['b_out'], params.svm['w_out'], params.svm['c_out'], params.svm['s_out'],
-                        authors_amount)
+    out_layer = FullConnected(params.svm['b_out'], T.tanh, name='out_layer', feature_amount=authors_amount)
+    Connection(pooling_layer, out_layer, params.svm['w_out'])
 
     # because need just pass forward of diss layer to svm
-    PoolConnection(dis_layer, out_layer)
+    # PoolConnection(dis_layer, out_layer)
+
+    # PoolConnection(pooling_layer,out_layer)
 
     # Connection(pool_top, dis_layer, params.w['w_dis_top'])
     # Connection(pool_left, dis_layer, params.w['w_dis_left'])
@@ -205,9 +211,9 @@ def build_net(nodes: Nodes, params: Params, pool_cutoff, authors_amount):
 
     layers.append(pooling_layer)
 
-    layers.append(dis_layer)
+    # layers.append(dis_layer)
     layers.append(out_layer)
-    return layers, used_embeddings
+    return layers, used_embeddings, pooling_layer
 
 
 # # numerically stable log-softmax with crossentropy
@@ -218,7 +224,7 @@ def build_net(nodes: Nodes, params: Params, pool_cutoff, authors_amount):
 # g2 = T.grad(cm2.mean(),x)
 
 def construct_network(nodes: Nodes, parameters: Params, mode: BuildMode, pool_cutoff, author_amount):
-    net, used_embeddings = build_net(nodes, parameters, pool_cutoff, author_amount)
+    net, used_embeddings, dis_layer = build_net(nodes, parameters, pool_cutoff, author_amount)
 
     # print(pool_cutoff)
 
@@ -241,12 +247,14 @@ def construct_network(nodes: Nodes, parameters: Params, mode: BuildMode, pool_cu
     def back_propagation(net_forward):
         target = T.fvector('target')
 
-        cost = T.mean(T.nnet.binary_crossentropy(net_forward, target))
+        # cost = T.mean(T.nnet.binary_crossentropy(net_forward, target))
         error = T.mean(T.neq(T.round(net_forward), target))
 
         # cost = -T.sum(target * T.log(net_forward), axis=0)
 
-        # cost = T.std(net_forward - target)
+        # cost = T.std(net_forward - target) + 1e-2
+
+        cost = T.sqrt(T.mean(T.sqr(net_forward - target) + 1e-10))
 
         # def hinge(self, u):
         #     return T.maximum(0, 1 - u)
@@ -288,15 +296,30 @@ def construct_network(nodes: Nodes, parameters: Params, mode: BuildMode, pool_cu
             updates = adadelta(cost, used_params)
             svm_updates = adadelta(cost, svm_params)
 
-            return function([target], [cost, error, net_forward], updates=updates), function([target],
-                                                                                             [cost, error, net_forward],
-                                                                                             updates=svm_updates)
+            # updates = sgd(cost, used_params, 0.0001)
+            # svm_updates = sgd(cost, svm_params, 0.0001)
+
+            # updates = adam(cost, used_params)
+            # svm_updates = adadelta(cost, svm_params)
+
+            # updates = nesterov_momentum(cost, used_params, 0.1)
+            # svm_updates = adam(cost, svm_params)
+
+            return function([target], [cost, error, net_forward, tbcnn_out], updates=updates
+                            # , mode=NanGuardMode(True, True, True, 'None')
+                            ), \
+                   function([target], [cost, error, net_forward, tbcnn_out], updates=svm_updates
+                            # , mode=NanGuardMode(True, True, True, 'None')
+                            )
         else:
-            return function([target], [cost, error, net_forward])
+            return function([target], [cost, error, net_forward, tbcnn_out])
 
     f_builder(net[-1])
 
     net_forward = net[-1].forward
+    tbcnn_out = dis_layer.forward
+
+    # pydotprint(net_forward,'net_fwd.jpg',format='jpg')
 
     if mode == BuildMode.train or mode == BuildMode.validation:
         return back_propagation(net_forward)

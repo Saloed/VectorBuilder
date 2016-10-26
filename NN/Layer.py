@@ -88,19 +88,22 @@ class FullConnected(Layer):
 
 
 class RBF_SVM(Layer):
-    def __init__(self, bias: TS, w: TS, c: TS, s: TS, feature_amount, name='SVM'):
+    def __init__(self, bias: TS, w: TS,
+                 # c: TS, s: TS,
+                 feature_amount, name='SVM'):
         super().__init__(name, feature_amount)
-        self.bias = bias
+        self.b = bias
         self.w = w
-        self.c = c
-        self.s = s
+        # self.c = c
+        # self.s = s
 
     def build_forward(self):
-        # assunming that only one in coneection exist
+        # assuming that only one in connection exist
         x = self.in_connection[0].forward
-        difnorm = T.sum((self.c - x) ** 2, axis=-1)
-        kernel = T.exp(-difnorm * (self.s ** 2))
-        self.forward = T.nnet.sigmoid(T.dot(kernel, self.w) + self.bias)
+        # difnorm = T.std(x - self.c)
+        # kernel = T.exp(difnorm / -(T.sqr(self.s)))
+        # self.forward = T.dot(self.w, kernel) + self.bias
+        # self.forward = T.nnet.sigmoid(T.sqrt(T.sqr(T.dot(x, self.w) + self.b).sum()))
 
 
 class Pooling(Layer):
