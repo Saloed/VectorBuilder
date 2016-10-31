@@ -16,6 +16,7 @@ class Layer:
         self.in_connection = []
         self.forward = None
 
+
     @abstractmethod
     def build_forward(self):
         pass
@@ -37,6 +38,15 @@ class Embedding(Layer):
 
     def build_forward(self):
         pass
+
+
+class Placeholder(Layer):
+    def build_forward(self):
+        pass
+
+    def __init__(self, symbolic, name, feature_amount):
+        super().__init__(name, feature_amount)
+        self.forward = symbolic
 
 
 class Combination(Layer):
