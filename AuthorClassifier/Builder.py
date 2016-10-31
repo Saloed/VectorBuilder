@@ -106,15 +106,17 @@ ConvolveParams = namedtuple('ConvolveParams',
 #         convolve_creator(child, child_info, conv_layers, depth + 1, cp)
 
 # one way pooling (applied now)
-def convolve_creator(root_node, pooling_layer, conv_layers, layers, params):
+def convolve_creator(root_node, pooling_layer, conv_layers, layers, params, parameters_amount: dict):
     child_len = len(root_node.children)
     # if child_len == 0: return
     conv_layer = Convolution(params.b['b_conv'], "convolve_" + str(root_node))
     conv_layers.append(conv_layer)
     root_layer = layers[root_node.index]
     Connection(root_layer, conv_layer, params.w['w_conv_root'])
-
     PoolConnection(conv_layer, pooling_layer)
+
+    parameters_amount['w_conv_root'] += 1
+    parameters_amount['b_conv'] += 1
 
     for child in root_node.children:
         if child_len == 1:
@@ -126,14 +128,16 @@ def convolve_creator(root_node, pooling_layer, conv_layers, layers, params):
 
         child_layer = layers[child.index]
         if left_w != 0:
+            parameters_amount['w_conv_left'] += 1
             Connection(child_layer, conv_layer, params.w['w_conv_left'], left_w)
         if right_w != 0:
+            parameters_amount['w_conv_right'] += 1
             Connection(child_layer, conv_layer, params.w['w_conv_right'], right_w)
 
-        convolve_creator(child, pooling_layer, conv_layers, layers, params)
+        convolve_creator(child, pooling_layer, conv_layers, layers, params, parameters_amount)
 
 
-def build_net(nodes: Nodes, params: Params, pool_cutoff, authors_amount):
+def build_net(nodes: Nodes, params: Params, pool_cutoff, authors_amount, parameters_amount: dict):
     used_embeddings = {}
     nodes_amount = len(nodes.all_nodes)
 
@@ -151,11 +155,18 @@ def build_net(nodes: Nodes, params: Params, pool_cutoff, authors_amount):
         Connection(ae_layer, cmb_layer, params.w['w_comb_ae'])
         Connection(emb_layer, cmb_layer, params.w['w_comb_emb'])
         _layers[node.index] = cmb_layer
+
+        parameters_amount['b_construct'] += 1
+        parameters_amount['w_comb_ae'] += 1
+        parameters_amount['w_comb_emb'] += 1
+
         for child in node.children:
             if child.left_rate != 0:
+                parameters_amount['w_left'] += 1
                 Connection(_layers[child.index], ae_layer, params.w['w_left'],
                            w_coeff=child.left_rate * child.leaf_num / node.leaf_num)
             if child.right_rate != 0:
+                parameters_amount['w_right'] += 1
                 Connection(_layers[child.index], ae_layer, params.w['w_right'],
                            w_coeff=child.right_rate * child.leaf_num / node.leaf_num)
 
@@ -169,7 +180,7 @@ def build_net(nodes: Nodes, params: Params, pool_cutoff, authors_amount):
     # convolve_creator(nodes.root_node, 'unknown', conv_layers, 0, conv_params)
 
     pooling_layer = Pooling('pool', NUM_CONVOLUTION)
-    convolve_creator(nodes.root_node, pooling_layer, conv_layers, _layers, params)
+    convolve_creator(nodes.root_node, pooling_layer, conv_layers, _layers, params, parameters_amount)
 
     # dis_layer = FullConnected(params.b['b_dis'], activation=T.tanh,
     #                           name='discriminative', feature_amount=NUM_DISCRIMINATIVE)
@@ -224,7 +235,13 @@ def build_net(nodes: Nodes, params: Params, pool_cutoff, authors_amount):
 # g2 = T.grad(cm2.mean(),x)
 
 def construct_network(nodes: Nodes, parameters: Params, mode: BuildMode, pool_cutoff, author_amount):
-    net, used_embeddings, dis_layer = build_net(nodes, parameters, pool_cutoff, author_amount)
+    parameters_amount = {}
+    for k in parameters.w.keys():
+        parameters_amount[k] = 0
+    for k in parameters.b.keys():
+        parameters_amount[k] = 0
+
+    net, used_embeddings, dis_layer = build_net(nodes, parameters, pool_cutoff, author_amount, parameters_amount)
 
     # print(pool_cutoff)
 
@@ -290,10 +307,20 @@ def construct_network(nodes: Nodes, parameters: Params, mode: BuildMode, pool_cu
         # cost = theano.tensor.nnet.relu(rest - corrects + 1)[0]
 
         if mode == BuildMode.train:
-            used_params = list(used_embeddings.values()) + list(parameters.b.values()) + list(parameters.w.values())
-            svm_params = list(parameters.svm.values())
+            used_embs = list(used_embeddings.values())
+            grads_embs = T.grad(cost, used_embs)
 
-            updates = adadelta(cost, used_params)
+            used_params = list(parameters.b.values()) + list(parameters.w.values())
+            params_keys = list(parameters.b.keys()) + list(parameters.w.keys())
+
+            grad_params = T.grad(cost, used_params)
+
+            for i, k in enumerate(params_keys):
+                grad_params[i] = grad_params[i] / parameters_amount[k]
+
+            updates = adadelta(grad_params, used_params)
+
+            svm_params = list(parameters.svm.values())
             svm_updates = adadelta(cost, svm_params)
 
             # updates = sgd(cost, used_params, 0.0001)
@@ -305,14 +332,14 @@ def construct_network(nodes: Nodes, parameters: Params, mode: BuildMode, pool_cu
             # updates = nesterov_momentum(cost, used_params, 0.1)
             # svm_updates = adam(cost, svm_params)
 
-            return function([target], [cost, error, net_forward, tbcnn_out], updates=updates
+            return function([target], [cost, error, net_forward], updates=updates
                             # , mode=NanGuardMode(True, True, True, 'None')
                             ), \
-                   function([target], [cost, error, net_forward, tbcnn_out], updates=svm_updates
+                   function([target], [cost, error, net_forward], updates=svm_updates
                             # , mode=NanGuardMode(True, True, True, 'None')
                             )
         else:
-            return function([target], [cost, error, net_forward, tbcnn_out])
+            return function([target], [cost, error, net_forward])
 
     f_builder(net[-1])
 

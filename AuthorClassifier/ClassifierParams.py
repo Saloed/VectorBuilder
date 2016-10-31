@@ -20,7 +20,7 @@ BATCH_SIZE = 1
 RANDOM_RANGE = 0.02
 
 NUM_RETRY = 200
-NUM_EPOCH = 1000
+NUM_EPOCH = 4000
 
 Network = namedtuple('Network', ['forward', 'back', 'validation'])
 
@@ -58,6 +58,7 @@ class Params:
             # 'b_dis': b_dis,
 
         }
+
         self.svm = {
             'w_out': w_out,
             'b_out': b_out,

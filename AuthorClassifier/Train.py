@@ -14,7 +14,7 @@ from AuthorClassifier.ClassifierParams import NUM_RETRY, NUM_EPOCH
 
 from AST.GitAuthor import get_repo_methods_with_authors
 from AuthorClassifier.Builder import construct_from_nodes, BuildMode
-from AuthorClassifier.InitParams import init_params
+from AuthorClassifier.InitParams import init_params, reset_params
 from Utils.Visualization import new_figure, update_figure, save_to_file
 from Utils.Wrappers import safe_run
 
@@ -75,6 +75,7 @@ def build_vectors(authors):
 
 def process_set(batches, nparams, need_back, authors):
     err = 0
+    rerr = 0
     size = len(batches)
     author_amount = len(authors)
     reverse_index = build_vectors(authors)
@@ -85,22 +86,24 @@ def process_set(batches, nparams, need_back, authors):
                 fprint(['build {}'.format(i)])
                 batch.back, batch.back_svm = construct_from_nodes(batch.ast, nparams, BuildMode.train, author_amount)
             if i < 0.7 * size:
-                terr, e, res, net_out = batch.back(author)
+                terr, e, res = batch.back(author)
             else:
-                terr, e, res, net_out = batch.back_svm(author)
-            fprint([batch.author, author, res, terr, e, net_out])
+                terr, e, res = batch.back_svm(author)
+            fprint([batch.author, author, res, terr, e])
+            rerr += e
             err += terr
         else:
             if batch.valid is None:
                 fprint(['build {}'.format(i)])
                 batch.valid = construct_from_nodes(batch.ast, nparams, BuildMode.validation, author_amount)
-            terr, e, res, net_out = batch.valid(author)
-            fprint([batch.author, author, res, terr, e, net_out])
+            terr, e, res = batch.valid(author)
+            fprint([batch.author, author, res, terr, e])
+            rerr += e
             err += terr
         # fprint([nparams.w['w_conv_root'].eval(), nparams.b['b_conv'].eval()])
         if math.isnan(terr):
             raise Exception('Error is NAN. Start new retry')
-    return err / size
+    return err / size, rerr / size
 
 
 @safe_run
@@ -110,17 +113,17 @@ def epoch_step(nparams, train_epoch, retry_num, batches, test_set, authors):
     result = process_set(batches, nparams, True, authors)
     if result is None:
         return
-    tr_err = result
+    tr_err, tr_rerr = result
     fprint(['test set'])
     result = process_set(test_set, nparams, False, authors)
     if result is None:
         return
-    test_err = result
+    test_err, test_rerr = result
 
     print_str = [
         'end of epoch {0} retry {1}'.format(train_epoch, retry_num),
-        'train\t|\t{}'.format(tr_err),
-        'test\t|\t{}'.format(test_err),
+        'train\t|\t{}|\t{}'.format(tr_err, tr_rerr),
+        'test\t|\t{}|\t{}'.format(test_err, test_rerr),
         '################'
     ]
     fprint(print_str, log_file)
@@ -141,8 +144,8 @@ def reset_batches(batches):
 
 
 @safe_run
-def train_step(retry_num, batches, test_set, authors):
-    nparams = init_params(authors, 'emb_params')
+def train_step(retry_num, batches, test_set, authors, nparams):
+    init_params(authors, 'emb_params')
     reset_batches(batches)
     reset_batches(test_set)
     plot_axes, plot = new_figure(retry_num, NUM_EPOCH, 4)  # len(authors) + 1)
@@ -284,10 +287,10 @@ def main():
     authors, r_index = collapse_authors(all_authors)
     all_batches = generate_batches(dataset.methods_with_authors, r_index)
     batches, r_index, authors = group_batches(all_batches, r_index, authors)
-    train_set, test_set = divide_data_set(batches, 20, 5)
-
+    train_set, test_set = divide_data_set(batches, 200, 100)
+    nparams = init_params(authors, 'emb_params')
     for train_retry in range(NUM_RETRY):
-        train_step(train_retry, train_set, test_set, authors)
+        train_step(train_retry, train_set, test_set, authors, nparams)
 
 
 if __name__ == '__main__':
