@@ -179,7 +179,7 @@ def build_parts(params: Params, authors_amount) -> NetParts:
     parts.pooling = NetPart(pool_fun, [])
 
     def net_eval_function(convolve_results: list, target):
-        return parts.classifier(parts.pooling(T.join(0, convolve_results)), target)
+        return parts.classifier(parts.pooling(convolve_results), target)
 
     parts.net_function = net_eval_function
 
