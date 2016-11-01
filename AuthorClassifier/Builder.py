@@ -318,7 +318,7 @@ def construct_network(nodes: Nodes, parameters: Params, mode: BuildMode, pool_cu
             for i, k in enumerate(params_keys):
                 grad_params[i] = grad_params[i] / parameters_amount[k]
 
-            updates = adadelta(grad_params, used_params)
+            updates = adadelta(grad_params + grads_embs, used_params + used_embs)
 
             svm_params = list(parameters.svm.values())
             svm_updates = adadelta(cost, svm_params)

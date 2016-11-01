@@ -10,11 +10,14 @@ import numpy as np
 import theano
 
 from AST.Tokenizer import print_ast
-from AuthorClassifier.ClassifierParams import NUM_RETRY, NUM_EPOCH
-
 from AST.GitAuthor import get_repo_methods_with_authors
-from AuthorClassifier.Builder import construct_from_nodes, BuildMode
+
+from AuthorClassifier.ClassifierParams import NUM_RETRY, NUM_EPOCH
 from AuthorClassifier.InitParams import init_params, reset_params
+
+from NewAuthorClassifier.ExtremelyNewBuilder import construct_from_nodes, BuildMode
+from NewAuthorClassifier.ExtremelyNewBuilder import build_parts
+
 from Utils.Visualization import new_figure, update_figure, save_to_file
 from Utils.Wrappers import safe_run
 
@@ -74,36 +77,33 @@ def build_vectors(authors):
 
 
 def process_set(batches, nparams, need_back, authors):
-    err = 0
-    rerr = 0
+    avg_cost = 0
+    avg_err = 0
     size = len(batches)
     author_amount = len(authors)
     reverse_index = build_vectors(authors)
+    parts = build_parts(nparams, author_amount)
     for i, batch in enumerate(batches):
         author = reverse_index[batch.author]
         if need_back:
             if batch.back is None or batch.back_svm is None:
                 fprint(['build {}'.format(i)])
-                batch.back, batch.back_svm = construct_from_nodes(batch.ast, nparams, BuildMode.train, author_amount)
-            if i < 0.7 * size:
-                terr, e, res = batch.back(author)
-            else:
-                terr, e, res = batch.back_svm(author)
-            fprint([batch.author, author, res, terr, e])
-            rerr += e
-            err += terr
+                batch.back = construct_from_nodes(batch.ast, nparams, BuildMode.train, author_amount)
+            res, cost, err = parts.net_function(batch.back(author), author)
+            fprint([batch.author, author, res, cost, err])
+            avg_err += err
+            avg_cost += cost
         else:
             if batch.valid is None:
                 fprint(['build {}'.format(i)])
                 batch.valid = construct_from_nodes(batch.ast, nparams, BuildMode.validation, author_amount)
-            terr, e, res = batch.valid(author)
-            fprint([batch.author, author, res, terr, e])
-            rerr += e
-            err += terr
-        # fprint([nparams.w['w_conv_root'].eval(), nparams.b['b_conv'].eval()])
-        if math.isnan(terr):
-            raise Exception('Error is NAN. Start new retry')
-    return err / size, rerr / size
+            res, cost, err = parts.net_function(batch.valid(), author)
+            fprint([batch.author, author, res, cost, err])
+            avg_err += err
+            avg_cost += cost
+        if math.isnan(cost):
+            raise Exception('Cost is NAN. Start new retry')
+    return avg_cost / size, avg_err / size
 
 
 @safe_run
@@ -287,7 +287,7 @@ def main():
     authors, r_index = collapse_authors(all_authors)
     all_batches = generate_batches(dataset.methods_with_authors, r_index)
     batches, r_index, authors = group_batches(all_batches, r_index, authors)
-    train_set, test_set = divide_data_set(batches, 150, 50)
+    train_set, test_set = divide_data_set(batches, 200, 100)
     nparams = init_params(authors, 'emb_params')
     for train_retry in range(NUM_RETRY):
         train_step(train_retry, train_set, test_set, authors, nparams)

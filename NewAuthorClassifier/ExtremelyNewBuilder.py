@@ -150,11 +150,15 @@ def build_net(nodes: Nodes, params: Params, authors_amount, parameters_amount: d
     layers.append(pooling_layer)
 
     layers.append(out_layer)
-    return layers, used_embeddings, pooling_layer
+    return used_embeddings, conv_layers, out_layer
 
 
 def loss_function(net_forward, target):
     return T.sqrt(T.mean(T.sqr(net_forward - target) + 1e-10))
+
+
+def error_function(net_forward, target):
+    return (T.neq(T.round(net_forward), target)).mean()
 
 
 def build_parts(params: Params, authors_amount) -> NetParts:
@@ -166,31 +170,53 @@ def build_parts(params: Params, authors_amount) -> NetParts:
     classifier = FullConnected(params.svm['b_out'], T.tanh, 'out_layer', authors_amount)
     Connection(cl_input, classifier, params.svm['w_out'])
     cl_params = [params.svm['b_out'], params.svm['w_out']]
-    f_builder(classifier)
+    build_net_forward(classifier)
     cl_frwd = classifier.forward
     cl_loss = loss_function(cl_frwd, target)
+    cl_error = error_function(cl_frwd, target)
     cl_update = adadelta(cl_loss, cl_params)
-    cl_fun = function([cl_in, target], [cl_frwd, cl_loss], updates=cl_update)
+    cl_fun = function([cl_in, target], [cl_frwd, cl_loss, cl_error], updates=cl_update, name='classifier')
     parts.classifier = NetPart(cl_fun, cl_update)
 
     pool_in = T.fmatrix('pool_in')
     pool_frwd = T.max(pool_in, axis=0)
-    pool_fun = function([pool_in], [pool_frwd])
+    pool_fun = function([pool_in], pool_frwd, name='pooling')
     parts.pooling = NetPart(pool_fun, [])
 
     def net_eval_function(convolve_results: list, target):
-        return parts.classifier(parts.pooling(convolve_results), target)
+        return parts.classifier.fun(parts.pooling.fun(convolve_results), target)
 
     parts.net_function = net_eval_function
 
+    return parts
 
-def f_builder(layer: Layer):
+
+def build_net_forward(layer: Layer):
     if layer.forward is None:
         for c in layer.in_connection:
             if c.forward is None:
-                f_builder(c.from_layer)
+                build_net_forward(c.from_layer)
                 c.build_forward()
         layer.build_forward()
+
+
+def back_propagation(out, net_forward, parameters, parameters_amount, used_embeddings):
+    target = T.fvector('target')
+    cost = loss_function(net_forward, target)
+    used_embs = list(used_embeddings.values())
+    grads_embs = T.grad(cost, used_embs)
+
+    used_params = list(parameters.b.values()) + list(parameters.w.values())
+    params_keys = list(parameters.b.keys()) + list(parameters.w.keys())
+
+    grad_params = T.grad(cost, used_params)
+
+    for i, k in enumerate(params_keys):
+        grad_params[i] = grad_params[i] / parameters_amount[k]
+
+    updates = adadelta(grad_params + grads_embs, used_params + used_embs)
+
+    return function([target], [c.forward for c in out], updates=updates)
 
 
 def construct_network(nodes: Nodes, parameters: Params, mode: BuildMode, author_amount):
@@ -200,58 +226,9 @@ def construct_network(nodes: Nodes, parameters: Params, mode: BuildMode, author_
     for k in parameters.b.keys():
         parameters_amount[k] = 0
 
-    net, used_embeddings, dis_layer = build_net(nodes, parameters, author_amount, parameters_amount)
-
-    def back_propagation(net_forward):
-
-        target = T.fvector('target')
-
-        error = (T.neq(T.round(net_forward), target)) / 2
-        cost = loss_function(net_forward, target)
-
-        if mode == BuildMode.train:
-            used_embs = list(used_embeddings.values())
-            grads_embs = T.grad(cost, used_embs)
-
-            used_params = list(parameters.b.values()) + list(parameters.w.values())
-            params_keys = list(parameters.b.keys()) + list(parameters.w.keys())
-
-            grad_params = T.grad(cost, used_params)
-
-            for i, k in enumerate(params_keys):
-                grad_params[i] = grad_params[i] / parameters_amount[k]
-
-            updates = adadelta(grad_params, used_params)
-
-            svm_params = list(parameters.svm.values())
-            svm_updates = adadelta(cost, svm_params)
-
-            # updates = sgd(cost, used_params, 0.0001)
-            # svm_updates = sgd(cost, svm_params, 0.0001)
-
-            # updates = adam(cost, used_params)
-            # svm_updates = adadelta(cost, svm_params)
-
-            # updates = nesterov_momentum(cost, used_params, 0.1)
-            # svm_updates = adam(cost, svm_params)
-
-            return function([target], [cost, error, net_forward], updates=updates
-                            # , mode=NanGuardMode(True, True, True, 'None')
-                            ), \
-                   function([target], [cost, error, net_forward], updates=svm_updates
-                            # , mode=NanGuardMode(True, True, True, 'None')
-                            )
-        else:
-            return function([target], [cost, error, net_forward])
-
-    f_builder(net[-1])
-
-    net_forward = net[-1].forward
-    tbcnn_out = dis_layer.forward
-
-    # pydotprint(net_forward,'net_fwd.jpg',format='jpg')
-
-    if mode == BuildMode.train or mode == BuildMode.validation:
-        return back_propagation(net_forward)
+    used_embeddings, convolve, out = build_net(nodes, parameters, author_amount, parameters_amount)
+    build_net_forward(out)
+    if mode == BuildMode.train:
+        return back_propagation(convolve, out.forward, parameters, parameters_amount, used_embeddings)
     else:
-        return function([], net_forward)
+        return function([], [c.forward for c in convolve])
