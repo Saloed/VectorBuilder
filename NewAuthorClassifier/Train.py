@@ -76,17 +76,16 @@ def build_vectors(authors):
     return index
 
 
-def process_set(batches, nparams, need_back, authors):
+def process_set(batches, nparams, need_back, authors, parts):
     avg_cost = 0
     avg_err = 0
     size = len(batches)
     author_amount = len(authors)
     reverse_index = build_vectors(authors)
-    parts = build_parts(nparams, author_amount)
     for i, batch in enumerate(batches):
         author = reverse_index[batch.author]
         if need_back:
-            if batch.back is None or batch.back_svm is None:
+            if batch.back is None:
                 fprint(['build {}'.format(i)])
                 batch.back = construct_from_nodes(batch.ast, nparams, BuildMode.train, author_amount)
             res, cost, err = parts.net_function(batch.back(author), author)
@@ -107,15 +106,15 @@ def process_set(batches, nparams, need_back, authors):
 
 
 @safe_run
-def epoch_step(nparams, train_epoch, retry_num, batches, test_set, authors):
+def epoch_step(nparams, train_epoch, retry_num, batches, test_set, authors, parts):
     shuffle(batches)
     fprint(['train set'])
-    result = process_set(batches, nparams, True, authors)
+    result = process_set(batches, nparams, True, authors, parts)
     if result is None:
         return
     tr_err, tr_rerr = result
     fprint(['test set'])
-    result = process_set(test_set, nparams, False, authors)
+    result = process_set(test_set, nparams, False, authors, parts)
     if result is None:
         return
     test_err, test_rerr = result
@@ -148,9 +147,11 @@ def train_step(retry_num, batches, test_set, authors, nparams):
     init_params(authors, 'emb_params')
     reset_batches(batches)
     reset_batches(test_set)
+    parts = build_parts(nparams, len(authors))
+
     plot_axes, plot = new_figure(retry_num, NUM_EPOCH, 2)  # len(authors) + 1)
     for train_epoch in range(NUM_EPOCH):
-        error = epoch_step(nparams, train_epoch, retry_num, batches, test_set, authors)
+        error = epoch_step(nparams, train_epoch, retry_num, batches, test_set, authors, parts)
         if error is None:
             return
         verr, terr = error
