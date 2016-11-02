@@ -16,7 +16,6 @@ class Layer:
         self.in_connection = []
         self.forward = None
 
-
     @abstractmethod
     def build_forward(self):
         pass
@@ -73,9 +72,10 @@ class Encoder(Layer):
 
 class Convolution(Layer):
     def __init__(self, bias: TS, name="conv", feature_amount=NUM_CONVOLUTION,
-                 activation=T.nnet.relu):
+                 activation=T.nnet.relu, size=0):
         super().__init__(name, feature_amount)
         self.bias = bias
+        self.size = size
         self.activation = activation
 
     def build_forward(self):

@@ -87,16 +87,16 @@ def process_set(batches, nparams, need_back, authors, parts):
         if need_back:
             if batch.back is None:
                 fprint(['build {}'.format(i)])
-                batch.back = construct_from_nodes(batch.ast, nparams, BuildMode.train, author_amount)
-            res, cost, err = parts.net_function(batch.back(author), author)
+                batch.back = construct_from_nodes(batch.ast, nparams, BuildMode.train, author_amount, parts)
+            res, cost, err = parts.net_function(batch.ast, batch.back(author), author)
             fprint([batch.author, author, res, cost, err])
             avg_err += err
             avg_cost += cost
         else:
             if batch.valid is None:
                 fprint(['build {}'.format(i)])
-                batch.valid = construct_from_nodes(batch.ast, nparams, BuildMode.validation, author_amount)
-            res, cost, err = parts.net_function(batch.valid(), author)
+                batch.valid = construct_from_nodes(batch.ast, nparams, BuildMode.validation, author_amount, parts)
+            res, cost, err = parts.net_function(batch.ast, batch.valid(), author)
             fprint([batch.author, author, res, cost, err])
             avg_err += err
             avg_cost += cost
