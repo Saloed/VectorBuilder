@@ -156,17 +156,17 @@ def build_net(nodes: Nodes, params: Params, pool_cutoff, authors_amount, paramet
         Connection(emb_layer, cmb_layer, params.w['w_comb_emb'])
         _layers[node.index] = cmb_layer
 
-        parameters_amount['b_construct'] += 1
-        parameters_amount['w_comb_ae'] += 1
-        parameters_amount['w_comb_emb'] += 1
+        # parameters_amount['b_construct'] += 1
+        # parameters_amount['w_comb_ae'] += 1
+        # parameters_amount['w_comb_emb'] += 1
 
         for child in node.children:
             if child.left_rate != 0:
-                parameters_amount['w_left'] += 1
+                # parameters_amount['w_left'] += 1
                 Connection(_layers[child.index], ae_layer, params.w['w_left'],
                            w_coeff=child.left_rate * child.leaf_num / node.leaf_num)
             if child.right_rate != 0:
-                parameters_amount['w_right'] += 1
+                # parameters_amount['w_right'] += 1
                 Connection(_layers[child.index], ae_layer, params.w['w_right'],
                            w_coeff=child.right_rate * child.leaf_num / node.leaf_num)
 
@@ -307,18 +307,23 @@ def construct_network(nodes: Nodes, parameters: Params, mode: BuildMode, pool_cu
         # cost = theano.tensor.nnet.relu(rest - corrects + 1)[0]
 
         if mode == BuildMode.train:
-            used_embs = list(used_embeddings.values())
-            grads_embs = T.grad(cost, used_embs)
+            # used_embs = list(used_embeddings.values())
+            # grads_embs = T.grad(cost, used_embs)
 
-            used_params = list(parameters.b.values()) + list(parameters.w.values())
-            params_keys = list(parameters.b.keys()) + list(parameters.w.keys())
+            # used_params = list(parameters.b.values()) + list(parameters.w.values())
+            # params_keys = list(parameters.b.keys()) + list(parameters.w.keys())
+            params_keys = ['w_conv_left', 'w_conv_right', 'w_conv_root']
+            used_params = [parameters.w[k] for k in params_keys]
+            params_keys.append('b_conv')
+            used_params.append(parameters.b['b_conv'])
 
             grad_params = T.grad(cost, used_params)
 
             for i, k in enumerate(params_keys):
                 grad_params[i] = grad_params[i] / parameters_amount[k]
 
-            updates = adadelta(grad_params + grads_embs, used_params + used_embs)
+            # updates = adadelta(grad_params + grads_embs, used_params + used_embs)
+            updates = adadelta(grad_params, used_params)
 
             svm_params = list(parameters.svm.values())
             svm_updates = adadelta(cost, svm_params)

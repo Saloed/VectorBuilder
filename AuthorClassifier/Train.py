@@ -16,7 +16,7 @@ from AST.GitAuthor import get_repo_methods_with_authors
 from AuthorClassifier.Builder import construct_from_nodes, BuildMode
 from AuthorClassifier.InitParams import init_params, reset_params
 from Utils.Visualization import new_figure, update_figure, save_to_file
-from Utils.Wrappers import safe_run
+from Utils.Wrappers import safe_run, timing
 
 theano.config.floatX = 'float32'
 theano.config.mode = 'FAST_COMPILE'
@@ -73,6 +73,7 @@ def build_vectors(authors):
     return index
 
 
+@timing
 def process_set(batches, nparams, need_back, authors):
     err = 0
     rerr = 0
@@ -275,6 +276,8 @@ def test():
     print('author recognition error {} {}\nmean cross entropy {} {}'.format(author_err, author_err / size, err,
                                                                             err / size))
 
+
+# 150 train 50 test  12181 mem  180 sec test / more then 20 minutes train build time   1.034 sec avg epoch time
 
 def main():
     with open('../Dataset/author_file', 'rb') as f:

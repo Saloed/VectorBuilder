@@ -1,7 +1,8 @@
 class NetPart:
-    def __init__(self, fun, upd):
+    def __init__(self, fun, upd, valid):
         self.fun = fun
         self.upd = upd
+        self.valid = valid
 
 
 class NetParts:
@@ -11,6 +12,7 @@ class NetParts:
         self.conv_join = None
         self.convolution = None
         self.net_function = None
+        self.net_validate = None
 
 
 class ConvUnit:
@@ -85,8 +87,10 @@ def compute_leaf_num(root, nodes, depth=0):
     return root.leaf_num, root.children_num, avg_depth
 
 
-def update_function(loss, params):
-    return adadelta(loss, params)
+def update_function(loss, params, normalize_const):
+    grad_params = T.grad(loss, params)
+    normalized = [g / normalize_const for g in grad_params]
+    return adadelta(normalized, params)
 
 
 def build_convolve_updates(parts: NetParts, params: Params, authors_amount):
@@ -106,14 +110,15 @@ def build_convolve_updates(parts: NetParts, params: Params, authors_amount):
             else:
                 used_params = [params.w['w_conv_root'], params.b['b_conv']]
 
-            updates = update_function(cost, used_params)
+            norm_const = T.fscalar('norm_const')
+            updates = update_function(cost, used_params, norm_const)
             conv.upd = updates
             arguments = [i.forward for i in conv.inputs]
             arguments.insert(0, conv.root.forward)
-            conv.fun = function([target, arguments], conv_layer.forward,
-                                updates=updates, name='conv_'.format(conv.size))
-            conv.valid = function([arguments], conv_layer.forward,
-                                  name='conv_valid_'.format(conv.size))
+            conv.fun = function([target, norm_const] + arguments, conv_layer.forward,
+                                updates=updates, name='conv_{}'.format(conv.size))
+            conv.valid = function(arguments, conv_layer.forward,
+                                  name='conv_valid_{}'.format(conv.size))
 
 
 def convolve_creator(root_node, pooling_layer, conv_layers, layers, params, parameters_amount: dict, parts):
@@ -240,22 +245,35 @@ def build_parts(params: Params, authors_amount) -> NetParts:
     cl_error = error_function(cl_frwd, target)
     cl_update = adadelta(cl_loss, cl_params)
     cl_fun = function([cl_in, target], [cl_frwd, cl_loss, cl_error], updates=cl_update, name='classifier')
-    parts.classifier = NetPart(cl_fun, cl_update)
+    cl_valid = function([cl_in, target], [cl_frwd, cl_loss, cl_error], name='classifier_valid')
+    parts.classifier = NetPart(cl_fun, cl_update, cl_valid)
 
     pool_in = T.fmatrix('pool_in')
     pool_frwd = T.max(pool_in, axis=0)
     pool_fun = function([pool_in], pool_frwd, name='pooling')
-    parts.pooling = NetPart(pool_fun, [])
+    parts.pooling = NetPart(pool_fun, [], pool_fun)
 
     def net_eval_function(nodes: Nodes, embeddings: list, target):
-        convolve_results = [parts.convolution[len(node.children)](target,
-                                                                  embeddings[node.index] + [embeddings[c.index] for c in
-                                                                                            node.children]) for node
-                            in nodes.all_nodes]
-        return parts.classifier.fun(parts.pooling.fun(convolve_results), target)
+        return parts.classifier.fun(parts.pooling.fun([
+                                                          parts.convolution[len(node.children)].fun(
+                                                              *([target, len(node.children) + 1,
+                                                                 embeddings[node.index]] + [
+                                                                    embeddings[c.index]
+                                                                    for c in
+                                                                    node.children]))
+                                                          for node in nodes.all_nodes]), target)
+
+    def net_valid_functoin(nodes: Nodes, embeddings: list, target):
+        return parts.classifier.valid(parts.pooling.valid([
+                                                              parts.convolution[len(node.children)].valid(
+                                                                  *([embeddings[node.index]] + [
+                                                                      embeddings[c.index]
+                                                                      for c in
+                                                                      node.children]))
+                                                              for node in nodes.all_nodes]), target)
 
     parts.net_function = net_eval_function
-
+    parts.net_validate = net_valid_functoin
     parts.convolution = {}
 
     return parts
@@ -272,23 +290,23 @@ def build_net_forward(layer: Layer):
 
 def back_propagation(out, net_forward, parameters, parameters_amount, used_embeddings):
     target = T.fvector('target')
-    cost = loss_function(net_forward, target)
-    used_embs = list(used_embeddings.values())
-    grads_embs = T.grad(cost, used_embs)
+    # cost = loss_function(net_forward, target)
+    # used_embs = list(used_embeddings.values())
+    # grads_embs = T.grad(cost, used_embs)
+    #
+    # params_keys = ['w_left', 'w_right', 'w_comb_ae', 'w_comb_emb']
+    # used_params = [parameters.w[k] for k in params_keys]
+    # params_keys.append('b_construct')
+    # used_params.append(parameters.b['b_construct'])
+    #
+    # grad_params = T.grad(cost, used_params)
+    #
+    # for i, k in enumerate(params_keys):
+    #     grad_params[i] = grad_params[i] / parameters_amount[k]
+    #
+    # updates = update_function(grad_params + grads_embs, used_params + used_embs)
 
-    params_keys = ['w_left', 'w_right', 'w_comb_ae', 'w_comb_emb']
-    used_params = [parameters[k] for k in params_keys]
-    params_keys.append('b_construct')
-    used_params.append(parameters.b['b_construct'])
-
-    grad_params = T.grad(cost, used_params)
-
-    for i, k in enumerate(params_keys):
-        grad_params[i] = grad_params[i] / parameters_amount[k]
-
-    updates = update_function(grad_params + grads_embs, used_params + used_embs)
-
-    return function([target], [c.forward for c in out], updates=updates)
+    return function([target], [c.forward for c in out], on_unused_input='ignore')  # , updates=updates)
 
 
 def construct_network(nodes: Nodes, parameters: Params, mode: BuildMode, author_amount, parts):

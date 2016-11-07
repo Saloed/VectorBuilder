@@ -19,7 +19,7 @@ from NewAuthorClassifier.ExtremelyNewBuilder import construct_from_nodes, BuildM
 from NewAuthorClassifier.ExtremelyNewBuilder import build_parts
 
 from Utils.Visualization import new_figure, update_figure, save_to_file
-from Utils.Wrappers import safe_run
+from Utils.Wrappers import safe_run, timing
 
 theano.config.floatX = 'float32'
 theano.config.mode = 'FAST_COMPILE'
@@ -76,6 +76,7 @@ def build_vectors(authors):
     return index
 
 
+@timing
 def process_set(batches, nparams, need_back, authors, parts):
     avg_cost = 0
     avg_err = 0
@@ -89,15 +90,15 @@ def process_set(batches, nparams, need_back, authors, parts):
                 fprint(['build {}'.format(i)])
                 batch.back = construct_from_nodes(batch.ast, nparams, BuildMode.train, author_amount, parts)
             res, cost, err = parts.net_function(batch.ast, batch.back(author), author)
-            fprint([batch.author, author, res, cost, err])
+            # fprint([batch.author, author, res, cost, err])
             avg_err += err
             avg_cost += cost
         else:
             if batch.valid is None:
                 fprint(['build {}'.format(i)])
                 batch.valid = construct_from_nodes(batch.ast, nparams, BuildMode.validation, author_amount, parts)
-            res, cost, err = parts.net_function(batch.ast, batch.valid(), author)
-            fprint([batch.author, author, res, cost, err])
+            res, cost, err = parts.net_validate(batch.ast, batch.valid(), author)
+            # fprint([batch.author, author, res, cost, err])
             avg_err += err
             avg_cost += cost
         if math.isnan(cost):
@@ -105,7 +106,7 @@ def process_set(batches, nparams, need_back, authors, parts):
     return avg_cost / size, avg_err / size
 
 
-@safe_run
+# @safe_run
 def epoch_step(nparams, train_epoch, retry_num, batches, test_set, authors, parts):
     shuffle(batches)
     fprint(['train set'])
@@ -142,7 +143,7 @@ def reset_batches(batches):
     gc.collect()
 
 
-@safe_run
+# @safe_run
 def train_step(retry_num, batches, test_set, authors, nparams):
     init_params(authors, 'emb_params')
     reset_batches(batches)
@@ -277,6 +278,8 @@ def test():
                                                                             err / size))
 
 
+# 150 train 50 test  3486 mem   112 sec test/ 161 sec train  build time   30 sec avg epoch time
+
 def main():
     with open('../Dataset/author_file', 'rb') as f:
         dataset = P.load(f)
@@ -288,7 +291,7 @@ def main():
     authors, r_index = collapse_authors(all_authors)
     all_batches = generate_batches(dataset.methods_with_authors, r_index)
     batches, r_index, authors = group_batches(all_batches, r_index, authors)
-    train_set, test_set = divide_data_set(batches, 200, 100)
+    train_set, test_set = divide_data_set(batches, 150, 50)
     nparams = init_params(authors, 'emb_params')
     for train_retry in range(NUM_RETRY):
         train_step(train_retry, train_set, test_set, authors, nparams)
