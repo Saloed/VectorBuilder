@@ -118,7 +118,8 @@ def epoch_step(params, epoch_num, retry_num, tparams, batches, train_set_size, d
     fprint(print_str, log_file)
     alpha *= 0.999
     if epoch_num % 100 == 0:
-        with open('NewParams/new_params_t' + str(retry_num) + "_ep" + str(epoch_num), mode='wb') as new_params:
+        with open('Embeddings/NewParams/new_params_t' + str(retry_num) + "_ep" + str(epoch_num),
+                  mode='wb') as new_params:
             c_pickle.dump(params, new_params)
 
     train_size = len(train_set)
@@ -155,7 +156,7 @@ def train_step(retry_num, batches, train_set_size, token_set, decay):
 
 
 def main():
-    dataset_dir = '../Dataset/'
+    dataset_dir = 'Dataset/'
     with open(dataset_dir + 'ast_file', mode='rb') as ast_file:
         data_ast = c_pickle.load(ast_file)
     token_set = data_ast.token_set
