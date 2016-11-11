@@ -13,7 +13,7 @@ from collections import namedtuple
 import gc
 
 theano.config.floatX = 'float32'
-theano.config.mode = 'FAST_COMPILE'
+theano.config.mode = 'FAST_RUN'
 
 # 0 because of preparing
 training_token_index = 0
@@ -149,7 +149,7 @@ def train_step(retry_num, batches, train_set_size, token_set, decay):
         tparams = epoch_step(nparams, train_epoch, retry_num, tparams, batches, train_set_size, decay)
         if tparams is None:
             return
-        update_figure(plot, plot_axes, train_epoch, tparams.error_to_print)
+        update_figure(plot, plot_axes, train_epoch, tparams.error_to_print, -1)
 
     save_to_file(plot, 'retry{}.png'.format(retry_num))
 

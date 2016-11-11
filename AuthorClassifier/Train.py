@@ -90,7 +90,7 @@ def process_set(batches, nparams, need_back, authors):
                 terr, e, res = batch.back(author)
             else:
                 terr, e, res = batch.back_svm(author)
-            fprint([batch.author, author, res, terr, e])
+            # fprint([batch.author, author, res, terr, e])
             rerr += e
             err += terr
         else:
@@ -98,7 +98,7 @@ def process_set(batches, nparams, need_back, authors):
                 fprint(['build {}'.format(i)])
                 batch.valid = construct_from_nodes(batch.ast, nparams, BuildMode.validation, author_amount)
             terr, e, res = batch.valid(author)
-            fprint([batch.author, author, res, terr, e])
+            # fprint([batch.author, author, res, terr, e])
             rerr += e
             err += terr
         # fprint([nparams.w['w_conv_root'].eval(), nparams.b['b_conv'].eval()])
@@ -146,7 +146,7 @@ def reset_batches(batches):
 
 @safe_run
 def train_step(retry_num, batches, test_set, authors, nparams):
-    init_params(authors, 'emb_params')
+    nparams = init_params(authors, 'emb_params')
     reset_batches(batches)
     reset_batches(test_set)
     plot_axes, plot = new_figure(retry_num, NUM_EPOCH, 2)  # len(authors) + 1)
@@ -290,7 +290,7 @@ def main():
     authors, r_index = collapse_authors(all_authors)
     all_batches = generate_batches(dataset.methods_with_authors, r_index)
     batches, r_index, authors = group_batches(all_batches, r_index, authors)
-    train_set, test_set = divide_data_set(batches, 150, 50)
+    train_set, test_set = divide_data_set(batches, 100, 100)
     nparams = init_params(authors, 'emb_params')
     for train_retry in range(NUM_RETRY):
         train_step(train_retry, train_set, test_set, authors, nparams)

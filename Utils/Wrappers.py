@@ -9,7 +9,7 @@ def timing(f):
         ret = f(*args)
         time2 = time.time()
         elapse = (time2 - time1) * 1000.0
-        seconds = elapse / 1000
+        seconds = elapse // 1000
         millis = elapse % 1000
         print('{} function elapse {} sec {} ms'.format(f.__name__, seconds, millis))
         return ret

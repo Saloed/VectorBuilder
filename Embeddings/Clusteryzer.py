@@ -18,21 +18,21 @@ def clustering(file_with_params):
     # print(values)
     X = np.array(values)
     Z = linkage(X)
-    fig = plt.figure(figsize=(200, 100))
-    ax = fig.add_subplot(1, 1, 1)
-    dendrogram(
-        Z,
-        truncate_mode='level',  # show only the last p merged clusters
-        p=21,  # show only the last p merged clusters
-        leaf_rotation=90.,  # rotates the x axis labels
-        leaf_font_size=8,  # font size for the x axis labels
-        labels=names,
-        ax=ax
-    )
-    fig.show()
-    fig.savefig('claster.png')
+    # fig = plt.figure(figsize=(200, 100))
+    # ax = fig.add_subplot(1, 1, 1)
+    # dendrogram(
+    #     Z,
+    #     truncate_mode='level',  # show only the last p merged clusters
+    #     p=21,  # show only the last p merged clusters
+    #     leaf_rotation=90.,  # rotates the x axis labels
+    #     leaf_font_size=8,  # font size for the x axis labels
+    #     labels=names,
+    #     ax=ax
+    # )
+    # fig.show()
+    # fig.savefig('claster.png')
     size = len(names)
-    num_clasters = 10
+    num_clasters = 12
     centroids, _ = kmeans(X, num_clasters)
     idx, _ = vq(X, centroids)
     result = {}

@@ -72,7 +72,7 @@ def get_all_available_tokens(parser) -> list:
 
 
 def _method_search(root: Token, methods: list) -> list:
-    if root.token_type == 'MethodDeclaration':
+    if root.token_type == 'METHOD':
         root.parent.children.remove(root)
         root.parent = None
         methods.append(root)
