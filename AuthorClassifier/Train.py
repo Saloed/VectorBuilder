@@ -25,8 +25,8 @@ theano.config.mode = 'FAST_COMPILE'
 # theano.config.exception_verbosity = 'high'
 
 def generate_author_file():
-    data_set = get_repo_methods_with_authors('../Dataset/TestRepo/')
-    with open('../Dataset/author_file', 'wb') as f:
+    data_set = get_repo_methods_with_authors('Dataset/TestRepo/')
+    with open('Dataset/author_file', 'wb') as f:
         P.dump(data_set, f)
 
 
@@ -37,7 +37,6 @@ class Batch:
         self.index = index
         self.valid = None
         self.back = None
-        self.back_svm = None
 
     def __str__(self):
         return '{} {} {}'.format(self.index, str(self.author), str(self.ast.root_node))
@@ -83,13 +82,10 @@ def process_set(batches, nparams, need_back, authors):
     for i, batch in enumerate(batches):
         author = reverse_index[batch.author]
         if need_back:
-            if batch.back is None or batch.back_svm is None:
+            if batch.back is None:
                 fprint(['build {}'.format(i)])
-                batch.back, batch.back_svm = construct_from_nodes(batch.ast, nparams, BuildMode.train, author_amount)
-            if i < 0.7 * size:
-                terr, e, res = batch.back(author)
-            else:
-                terr, e, res = batch.back_svm(author)
+                batch.back = construct_from_nodes(batch.ast, nparams, BuildMode.train, author_amount)
+            terr, e, res = batch.back(author)
             # fprint([batch.author, author, res, terr, e])
             rerr += e
             err += terr
@@ -130,7 +126,8 @@ def epoch_step(nparams, train_epoch, retry_num, batches, test_set, authors):
     fprint(print_str, log_file)
 
     if train_epoch % 100 == 0:
-        with open('NewParams/new_params_t' + str(retry_num) + "_ep" + str(train_epoch), mode='wb') as new_params:
+        with open('AuthorClassifier/NewParams/new_params_t' + str(retry_num) + "_ep" + str(train_epoch),
+                  mode='wb') as new_params:
             P.dump(nparams, new_params)
 
     return test_err, tr_err
@@ -146,7 +143,7 @@ def reset_batches(batches):
 
 @safe_run
 def train_step(retry_num, batches, test_set, authors, nparams):
-    nparams = init_params(authors, 'emb_params')
+    nparams = init_params(authors, 'AuthorClassifier/emb_params')
     reset_batches(batches)
     reset_batches(test_set)
     plot_axes, plot = new_figure(retry_num, NUM_EPOCH, 2)  # len(authors) + 1)
@@ -242,7 +239,7 @@ def divide_data_set(data_set, train_units, test_units):
 
 
 def test():
-    with open('../Dataset/author_file', 'rb') as f:
+    with open('Dataset/author_file', 'rb') as f:
         dataset = P.load(f)
 
     sys.setrecursionlimit(99999)
@@ -280,7 +277,7 @@ def test():
 # 150 train 50 test  12181 mem  180 sec test / more then 20 minutes train build time   1.034 sec avg epoch time
 
 def main():
-    with open('../Dataset/author_file', 'rb') as f:
+    with open('Dataset/author_file', 'rb') as f:
         dataset = P.load(f)
 
     sys.setrecursionlimit(99999)
@@ -291,7 +288,7 @@ def main():
     all_batches = generate_batches(dataset.methods_with_authors, r_index)
     batches, r_index, authors = group_batches(all_batches, r_index, authors)
     train_set, test_set = divide_data_set(batches, 100, 100)
-    nparams = init_params(authors, 'emb_params')
+    nparams = init_params(authors, 'AuthorClassifier/emb_params')
     for train_retry in range(NUM_RETRY):
         train_step(train_retry, train_set, test_set, authors, nparams)
 

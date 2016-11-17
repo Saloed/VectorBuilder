@@ -13,7 +13,7 @@ from collections import namedtuple
 import gc
 
 theano.config.floatX = 'float32'
-theano.config.mode = 'FAST_RUN'
+theano.config.mode = 'FAST_COMPILE'
 
 # 0 because of preparing
 training_token_index = 0

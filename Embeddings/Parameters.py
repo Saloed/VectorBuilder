@@ -1,7 +1,7 @@
 from theano.compile import SharedVariable as SV
 
 NUM_FEATURES = 30
-SAMPLES_AMOUNT = 6000
+SAMPLES_AMOUNT = 5600
 MARGIN = 1
 LEARN_RATE = 0.005
 MOMENTUM = 0.1
