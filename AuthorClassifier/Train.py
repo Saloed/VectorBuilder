@@ -62,13 +62,15 @@ def fprint(print_str: list, file=log_file):
 def build_vectors(authors):
     index = {}
     size = len(authors)
+    # assuming that we have only two authors
     for uauthor in authors:
         for author in uauthor[1]:
-            one_hot = np.ones(size, dtype='float32')
-            one_hot *= -1.0
-            # one_hot = np.zeros(size, dtype='float32')
-            one_hot[uauthor[0]] = 1
-            index[author] = one_hot
+            # one_hot = np.ones(size, dtype='float32')
+            # one_hot *= -1.0
+            # one_hot = np.zeros(size, dtype='int32')
+            # one_hot[uauthor[0]] = 1
+            # index[author] = one_hot
+            index[author] = uauthor[0]
     return index
 
 
@@ -103,7 +105,7 @@ def process_set(batches, nparams, need_back, authors):
     return err / size, rerr / size
 
 
-@safe_run
+# @safe_run
 def epoch_step(nparams, train_epoch, retry_num, batches, test_set, authors):
     shuffle(batches)
     fprint(['train set'])
@@ -141,7 +143,7 @@ def reset_batches(batches):
     gc.collect()
 
 
-@safe_run
+# @safe_run
 def train_step(retry_num, batches, test_set, authors, nparams):
     nparams = init_params(authors, 'AuthorClassifier/emb_params')
     reset_batches(batches)
@@ -150,7 +152,7 @@ def train_step(retry_num, batches, test_set, authors, nparams):
     for train_epoch in range(NUM_EPOCH):
         error = epoch_step(nparams, train_epoch, retry_num, batches, test_set, authors)
         if error is None:
-            return
+            break
         verr, terr = error
         update_figure(plot, plot_axes, train_epoch, verr, terr)
 
@@ -287,7 +289,7 @@ def main():
     authors, r_index = collapse_authors(all_authors)
     all_batches = generate_batches(dataset.methods_with_authors, r_index)
     batches, r_index, authors = group_batches(all_batches, r_index, authors)
-    train_set, test_set = divide_data_set(batches, 100, 100)
+    train_set, test_set = divide_data_set(batches, 100, 50)
     nparams = init_params(authors, 'AuthorClassifier/emb_params')
     for train_retry in range(NUM_RETRY):
         train_step(train_retry, train_set, test_set, authors, nparams)

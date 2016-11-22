@@ -64,7 +64,7 @@ ConvolveParams = namedtuple('ConvolveParams',
 
 
 # one way pooling (applied now)
-def convolve_creator(root_node, pooling_layer, conv_layers, layers, params, parameters_amount: dict):
+def convolve_creator(root_node, pooling_layer, conv_layers, layers, params):
     child_len = len(root_node.children)
     # if child_len == 0: return
     conv_layer = Convolution(params.b['b_conv'], "convolve_" + str(root_node))
@@ -72,9 +72,6 @@ def convolve_creator(root_node, pooling_layer, conv_layers, layers, params, para
     root_layer = layers[root_node.index]
     Connection(root_layer, conv_layer, params.w['w_conv_root'])
     PoolConnection(conv_layer, pooling_layer)
-
-    parameters_amount['w_conv_root'] += 1
-    parameters_amount['b_conv'] += 1
 
     for child in root_node.children:
         if child_len == 1:
@@ -86,16 +83,14 @@ def convolve_creator(root_node, pooling_layer, conv_layers, layers, params, para
 
         child_layer = layers[child.index]
         if left_w != 0:
-            parameters_amount['w_conv_left'] += 1
             Connection(child_layer, conv_layer, params.w['w_conv_left'], left_w)
         if right_w != 0:
-            parameters_amount['w_conv_right'] += 1
             Connection(child_layer, conv_layer, params.w['w_conv_right'], right_w)
 
-        convolve_creator(child, pooling_layer, conv_layers, layers, params, parameters_amount)
+        convolve_creator(child, pooling_layer, conv_layers, layers, params)
 
 
-def build_net(nodes: Nodes, params: Params, pool_cutoff, authors_amount, parameters_amount: dict):
+def build_net(nodes: Nodes, params: Params, pool_cutoff, authors_amount):
     used_embeddings = {}
     nodes_amount = len(nodes.all_nodes)
 
@@ -124,8 +119,8 @@ def build_net(nodes: Nodes, params: Params, pool_cutoff, authors_amount, paramet
 
     conv_layers = []
     pooling_layer = Pooling('pool', NUM_CONVOLUTION)
-    convolve_creator(nodes.root_node, pooling_layer, conv_layers, _layers, params, parameters_amount)
-    out_layer = FullConnected(params.svm['b_out'], T.tanh, name='out_layer', feature_amount=authors_amount)
+    convolve_creator(nodes.root_node, pooling_layer, conv_layers, _layers, params)
+    out_layer = FullConnected(params.svm['b_out'], T.nnet.sigmoid, name='out_layer', feature_amount=1)
     Connection(pooling_layer, out_layer, params.svm['w_out'])
     layers = _layers + conv_layers
     layers.append(pooling_layer)
@@ -140,7 +135,7 @@ def construct_network(nodes: Nodes, parameters: Params, mode: BuildMode, pool_cu
     for k in parameters.b.keys():
         parameters_amount[k] = 0
 
-    net, used_embeddings, dis_layer = build_net(nodes, parameters, pool_cutoff, author_amount, parameters_amount)
+    net, used_embeddings, dis_layer = build_net(nodes, parameters, pool_cutoff, author_amount)
 
     def f_builder(layer: Layer):
         if layer.forward is None:
@@ -151,16 +146,16 @@ def construct_network(nodes: Nodes, parameters: Params, mode: BuildMode, pool_cu
             layer.build_forward()
 
     def back_propagation(net_forward):
-        target = T.fvector('target')
-        error = T.mean(T.neq(T.round(net_forward), target))
-        cost = T.sqrt(T.mean(T.sqr(net_forward - target) + 1e-10))
+        target = T.iscalar('target')
+        error = T.neq(T.round(net_forward), target)
+        # cost = T.sqrt(T.mean(T.sqr(net_forward - target) + 1e-10))
+        cost = -T.max(target * T.log(net_forward) + (1 - target) * T.log(1 - net_forward))
+
         if mode == BuildMode.train:
-            params_keys = ['w_conv_left', 'w_conv_right', 'w_conv_root', 'w_comb_ae', 'w_comb_emb', 'w_left', 'w_right']
+            params_keys = ['w_conv_left', 'w_conv_right', 'w_conv_root', 'w_comb_ae', 'w_comb_emb']
             used_params = [parameters.w[k] for k in params_keys]
             params_keys.append('b_conv')
             used_params.append(parameters.b['b_conv'])
-            params_keys.append('b_construct')
-            used_params.append(parameters.b['b_construct'])
 
             used_params.extend(parameters.svm.values())
 
@@ -176,6 +171,7 @@ def construct_network(nodes: Nodes, parameters: Params, mode: BuildMode, pool_cu
     tbcnn_out = dis_layer.forward
 
     # pydotprint(net_forward,'net_fwd.jpg',format='jpg')
+    # raise Exception('dont need more')
 
     if mode == BuildMode.train or mode == BuildMode.validation:
         return back_propagation(net_forward)
