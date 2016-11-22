@@ -149,7 +149,7 @@ def construct_network(nodes: Nodes, parameters: Params, mode: BuildMode, pool_cu
         target = T.iscalar('target')
         error = T.neq(T.round(net_forward), target)
         # cost = T.sqrt(T.mean(T.sqr(net_forward - target) + 1e-10))
-        cost = -T.max(target * T.log(net_forward) + (1 - target) * T.log(1 - net_forward))
+        cost = -T.max(target * T.log(net_forward + 1e-10) + (1 - target) * T.log(1 - net_forward + 1e-10))
 
         if mode == BuildMode.train:
             params_keys = ['w_conv_left', 'w_conv_right', 'w_conv_root', 'w_comb_ae', 'w_comb_emb']

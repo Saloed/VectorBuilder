@@ -88,7 +88,7 @@ def process_set(batches, nparams, need_back, authors):
                 fprint(['build {}'.format(i)])
                 batch.back = construct_from_nodes(batch.ast, nparams, BuildMode.train, author_amount)
             terr, e, res = batch.back(author)
-            # fprint([batch.author, author, res, terr, e])
+            fprint([batch.author, author, res, terr, e])
             rerr += e
             err += terr
         else:
@@ -96,7 +96,7 @@ def process_set(batches, nparams, need_back, authors):
                 fprint(['build {}'.format(i)])
                 batch.valid = construct_from_nodes(batch.ast, nparams, BuildMode.validation, author_amount)
             terr, e, res = batch.valid(author)
-            # fprint([batch.author, author, res, terr, e])
+            fprint([batch.author, author, res, terr, e])
             rerr += e
             err += terr
         # fprint([nparams.w['w_conv_root'].eval(), nparams.b['b_conv'].eval()])
@@ -148,7 +148,7 @@ def train_step(retry_num, batches, test_set, authors, nparams):
     nparams = init_params(authors, 'AuthorClassifier/emb_params')
     reset_batches(batches)
     reset_batches(test_set)
-    plot_axes, plot = new_figure(retry_num, NUM_EPOCH, 2)  # len(authors) + 1)
+    plot_axes, plot = new_figure(retry_num, NUM_EPOCH, 8)  # len(authors) + 1)
     for train_epoch in range(NUM_EPOCH):
         error = epoch_step(nparams, train_epoch, retry_num, batches, test_set, authors)
         if error is None:
