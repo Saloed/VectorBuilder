@@ -88,7 +88,7 @@ def process_set(batches, nparams, need_back, authors):
                 fprint(['build {}'.format(i)])
                 batch.back = construct_from_nodes(batch.ast, nparams, BuildMode.train, author_amount)
             terr, e, res = batch.back(author)
-            fprint([batch.author, author, res, terr, e])
+            # fprint([batch.author, author, res, terr, e])
             rerr += e
             err += terr
         else:
@@ -96,7 +96,7 @@ def process_set(batches, nparams, need_back, authors):
                 fprint(['build {}'.format(i)])
                 batch.valid = construct_from_nodes(batch.ast, nparams, BuildMode.validation, author_amount)
             terr, e, res = batch.valid(author)
-            fprint([batch.author, author, res, terr, e])
+            # fprint([batch.author, author, res, terr, e])
             rerr += e
             err += terr
         # fprint([nparams.w['w_conv_root'].eval(), nparams.b['b_conv'].eval()])
@@ -138,7 +138,6 @@ def epoch_step(nparams, train_epoch, retry_num, batches, test_set, authors):
 def reset_batches(batches):
     for batch in batches:
         batch.back = None
-        batch.back_svm = None
         batch.valid = None
     gc.collect()
 

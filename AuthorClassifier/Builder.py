@@ -12,6 +12,8 @@ from AuthorClassifier.ClassifierParams import *
 from theano.compile.nanguardmode import NanGuardMode
 from enum import Enum
 
+from Utils.Wrappers import timing
+
 
 class BuildMode(Enum):
     train = 'train'
@@ -32,6 +34,7 @@ def compute_rates(root_node: Token):
             compute_rates(child)
 
 
+# @timing
 def construct_from_nodes(ast: Nodes, parameters: Params, mode: BuildMode, author_amount):
     # visualize(ast.root_node, 'ast.png')
     nodes = ast.all_nodes
