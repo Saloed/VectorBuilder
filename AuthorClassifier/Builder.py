@@ -162,7 +162,7 @@ def construct_network(nodes: Nodes, parameters: Params, mode: BuildMode, pool_cu
 
             used_params.extend(parameters.svm.values())
 
-            updates = adadelta(cost, used_params)
+            updates = sgd(cost, used_params, 0.001)
 
             return function([target], [cost, error, net_forward], updates=updates)
         else:

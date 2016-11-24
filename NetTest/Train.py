@@ -1,5 +1,6 @@
 import sys
 import pickle as P
+from copy import deepcopy
 from random import shuffle
 
 import gc
@@ -133,11 +134,31 @@ def reset_batches(batches):
     gc.collect()
 
 
+def make_pairs(methods):
+    marked = [(m, check_cycle(m)) for m in methods]
+    marked.sort(key=lambda m: m[1])
+    pairs = []
+    size = len(marked) - 1
+    i = 0
+    while marked[i][1] == 0 and marked[size - i][1] == 1:
+        pairs.append((marked[i], marked[size - i]))
+        i += 1
+    return pairs
+
+
 def divide_data_set(methods_with_authors, train_size, test_size):
-    train_set = [Batch(methods_with_authors[i], check_cycle(methods_with_authors[i])) for i in range(train_size)]
-    test_set = [Batch(methods_with_authors[i], check_cycle(methods_with_authors[i])) for i in
-                range(len(methods_with_authors) - test_size, len(methods_with_authors) - 1)]
-    return train_set, test_set
+    methods = deepcopy(methods_with_authors)
+    pairs = make_pairs(methods)
+    size = len(pairs)
+    tr_set = []
+    te_set = []
+    for i in range(train_size):
+        tr_set.append(pairs[i][0])
+        tr_set.append(pairs[i][1])
+    for i in range(size - 1, size - test_size, -1):
+        te_set.append(pairs[i][0])
+        te_set.append(pairs[i][1])
+    return tr_set, te_set
 
 
 def main():
