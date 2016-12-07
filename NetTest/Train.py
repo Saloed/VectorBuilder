@@ -43,12 +43,12 @@ class Batch:
         return self.__str__()
 
 
-# @safe_run
+@safe_run
 def train_step(retry_num, batches, test_set, nparams):
     nparams = init_params([], 'AuthorClassifier/emb_params')
-    # reset_batches(batches)
-    # reset_batches(test_set)
-    plot_axes, plot = new_figure(retry_num, NUM_EPOCH, 12)  # len(authors) + 1)
+    reset_batches(batches)
+    reset_batches(test_set)
+    plot_axes, plot = new_figure(retry_num, NUM_EPOCH, 1)  # len(authors) + 1)
     for train_epoch in range(NUM_EPOCH):
         error = epoch_step(nparams, train_epoch, retry_num, batches, test_set)
         if error is None:
@@ -72,7 +72,7 @@ def process_set(batches, nparams, need_back):
                 fprint(['build {}'.format(i)])
                 batch.back = construct_from_nodes(batch.ast, nparams, BuildMode.train, 1)
             terr, e, res = batch.back(batch.has_cycle)
-            fprint([batch.has_cycle, res, terr, e])
+            # fprint([batch.has_cycle, res, terr, e])
             rerr += e
             err += terr
         else:
@@ -80,7 +80,7 @@ def process_set(batches, nparams, need_back):
                 fprint(['build {}'.format(i)])
                 batch.valid = construct_from_nodes(batch.ast, nparams, BuildMode.validation, 1)
             terr, e, res = batch.valid(batch.has_cycle)
-            fprint([batch.has_cycle, res, terr, e])
+            # fprint([batch.has_cycle, res, terr, e])
             rerr += e
             err += terr
         # fprint([nparams.w['w_conv_root'].eval(), nparams.b['b_conv'].eval()])
@@ -89,7 +89,7 @@ def process_set(batches, nparams, need_back):
     return err / size, rerr / size
 
 
-# @safe_run
+@safe_run
 def epoch_step(nparams, train_epoch, retry_num, batches, test_set):
     shuffle(batches)
     fprint(['train set'])
@@ -153,11 +153,11 @@ def divide_data_set(methods_with_authors, train_size, test_size):
     tr_set = []
     te_set = []
     for i in range(train_size):
-        tr_set.append(pairs[i][0])
-        tr_set.append(pairs[i][1])
+        tr_set.append(Batch(pairs[i][0][0], pairs[i][0][1]))
+        tr_set.append(Batch(pairs[i][1][0], pairs[i][1][1]))
     for i in range(size - 1, size - test_size, -1):
-        te_set.append(pairs[i][0])
-        te_set.append(pairs[i][1])
+        te_set.append(Batch(pairs[i][0][0], pairs[i][0][1]))
+        te_set.append(Batch(pairs[i][1][0], pairs[i][1][1]))
     return tr_set, te_set
 
 
@@ -167,7 +167,7 @@ def main():
 
     sys.setrecursionlimit(99999)
     np.set_printoptions(threshold=100000)
-    train_set, test_set = divide_data_set(dataset.methods_with_authors, 100, 50)
+    train_set, test_set = divide_data_set(dataset.methods_with_authors, 50, 25)
     nparams = init_params([], 'AuthorClassifier/emb_params')
     for train_retry in range(NUM_RETRY):
         train_step(train_retry, train_set, test_set, nparams)

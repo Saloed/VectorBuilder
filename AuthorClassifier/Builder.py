@@ -1,6 +1,8 @@
+from collections import OrderedDict
+
 import theano.tensor as T
 import theano.tensor.extra_ops
-from lasagne.updates import adadelta, nesterov_momentum, sgd, adam
+from lasagne.updates import *
 from theano import function
 from lasagne.objectives import *
 from theano.printing import pydotprint
@@ -11,7 +13,7 @@ from NN.Layer import *
 from AuthorClassifier.ClassifierParams import *
 from theano.compile.nanguardmode import NanGuardMode
 from enum import Enum
-
+import theano.gradient as Tg
 from Utils.Wrappers import timing
 
 
@@ -131,6 +133,21 @@ def build_net(nodes: Nodes, params: Params, pool_cutoff, authors_amount):
     return layers, used_embeddings, pooling_layer
 
 
+def loss_function(target, net_frwd, params, need_l2: bool):
+    loss = -(target * T.log(net_frwd[0] + 1.e-10) + (1 - target) * T.log(1 - net_frwd[0] + 1.e-10))
+    if need_l2:
+        squared = [T.sqr(p).sum() for p in params]
+        loss = loss + l2_param * T.sum(squared)
+    return loss
+
+
+def get_updates(loss, params):
+    updates = adadelta(loss, params)
+    for k, u in updates.items():
+        updates[k] = T.clip(u, -clip_const, clip_const)
+    return updates
+
+
 def construct_network(nodes: Nodes, parameters: Params, mode: BuildMode, pool_cutoff, author_amount):
     parameters_amount = {}
     for k in parameters.w.keys():
@@ -151,21 +168,20 @@ def construct_network(nodes: Nodes, parameters: Params, mode: BuildMode, pool_cu
     def back_propagation(net_forward):
         target = T.iscalar('target')
         error = T.neq(T.round(net_forward), target)
-        # cost = T.sqrt(T.mean(T.sqr(net_forward - target) + 1e-10))
-        cost = -T.max(target * T.log(net_forward + 1e-10) + (1 - target) * T.log(1 - net_forward + 1e-10))
 
         if mode == BuildMode.train:
             params_keys = ['w_conv_left', 'w_conv_right', 'w_conv_root', 'w_comb_ae', 'w_comb_emb']
             used_params = [parameters.w[k] for k in params_keys]
             params_keys.append('b_conv')
             used_params.append(parameters.b['b_conv'])
-
             used_params.extend(parameters.svm.values())
 
-            updates = sgd(cost, used_params, 0.001)
+            cost = loss_function(target, net_forward, used_params, True)
+            updates = get_updates(cost, used_params)
 
             return function([target], [cost, error, net_forward], updates=updates)
         else:
+            cost = loss_function(target, net_forward, None, False)
             return function([target], [cost, error, net_forward])
 
     f_builder(net[-1])

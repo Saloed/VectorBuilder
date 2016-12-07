@@ -8,9 +8,9 @@ from random import randint, shuffle
 import math
 import numpy as np
 import theano
-
+import theano.gradient as Tg
 from AST.Tokenizer import print_ast
-from AuthorClassifier.ClassifierParams import NUM_RETRY, NUM_EPOCH
+from AuthorClassifier.ClassifierParams import NUM_RETRY, NUM_EPOCH, clip_const, Params
 
 from AST.GitAuthor import get_repo_methods_with_authors
 from AuthorClassifier.Builder import construct_from_nodes, BuildMode
@@ -105,7 +105,7 @@ def process_set(batches, nparams, need_back, authors):
     return err / size, rerr / size
 
 
-# @safe_run
+@safe_run
 def epoch_step(nparams, train_epoch, retry_num, batches, test_set, authors):
     shuffle(batches)
     fprint(['train set'])
@@ -142,12 +142,13 @@ def reset_batches(batches):
     gc.collect()
 
 
-# @safe_run
+@safe_run
 def train_step(retry_num, batches, test_set, authors, nparams):
     nparams = init_params(authors, 'AuthorClassifier/emb_params')
     reset_batches(batches)
     reset_batches(test_set)
-    plot_axes, plot = new_figure(retry_num, NUM_EPOCH, 8)  # len(authors) + 1)
+
+    plot_axes, plot = new_figure(retry_num, NUM_EPOCH, 1)  # len(authors) + 1)
     for train_epoch in range(NUM_EPOCH):
         error = epoch_step(nparams, train_epoch, retry_num, batches, test_set, authors)
         if error is None:

@@ -28,27 +28,29 @@ def fprint(print_str: list, file=log_file):
 
 
 # @timing
-def prepare_net(eval_set: EvaluationSet, params, is_validation):
+def prepare_net(eval_set: EvaluationSet, params, is_validation, index):
     if not is_validation:
         ast = eval_set.sample
         if eval_set.back_prop is None:
+            fprint(['build ', index])
             eval_set.back_prop = construct(ast.positive, params, ast.training_token_index, is_validation)
     else:
         ast = eval_set.sample
         if eval_set.validation is None:
+            fprint(['build ', index])
             eval_set.validation = construct(ast.positive, params, ast.training_token_index, is_validation)
     return eval_set
 
 
 # @timing
-def process_batch(batch, params, alpha, decay, is_validation):
+def process_batch(batch, params, alpha, decay, is_validation, index):
     total_t_err = 0
     total_a_err = 0
     # samples_size = 1
     samples_size = len(batch)
     for ind, sample in enumerate(batch):
         # print(ind)
-        eval_set = prepare_net(sample, params, is_validation)
+        eval_set = prepare_net(sample, params, is_validation, index)
         ept, err = process_network(eval_set, params, alpha, decay, is_validation)
         total_t_err += ept
         total_a_err += err
@@ -64,7 +66,7 @@ def process_batches(batches, params, alpha, decay, is_validation):
     error_per_ast = 0
     error_per_token = 0
     for i, batch in enumerate(batches):
-        epa, ept = process_batch(batch, params, alpha, decay, is_validation)
+        epa, ept = process_batch(batch, params, alpha, decay, is_validation, i)
         # message = ['\t\t|\t{}\t|\t{}\t|\t{}'.format(ept, epa, i)]
         # fprint(message)
         error_per_ast += epa
@@ -149,7 +151,7 @@ def train_step(retry_num, batches, train_set_size, token_set, decay):
     for train_epoch in range(EPOCH_IN_RETRY):
         tparams = epoch_step(nparams, train_epoch, retry_num, tparams, batches, train_set_size, decay)
         if tparams is None:
-            return
+            break
         update_figure(plot, plot_axes, train_epoch, tparams.error_to_print, -1)
 
     save_to_file(plot, 'retry{}.png'.format(retry_num))

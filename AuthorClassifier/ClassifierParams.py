@@ -3,12 +3,14 @@ from collections import namedtuple
 import theano.tensor
 import numpy as np
 
-NUM_FEATURES = 30
+NUM_FEATURES = 100
 
 margin = 1
 learn_rate = 0.0025  # 0.0001
 beta = .0001
 momentum = 0.1
+l2_param = 1.e-5
+clip_const = 1.e-3
 
 NUM_CONVOLUTION = 600  # 50
 NUM_DISCRIMINATIVE = 30  # 50
@@ -20,7 +22,7 @@ BATCH_SIZE = 1
 RANDOM_RANGE = 0.02
 
 NUM_RETRY = 200
-NUM_EPOCH = 4000
+NUM_EPOCH = 1000
 
 Network = namedtuple('Network', ['forward', 'back', 'validation'])
 
