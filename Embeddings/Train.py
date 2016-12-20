@@ -1,7 +1,10 @@
 import _pickle as c_pickle
 import os
+from copy import deepcopy
 from random import shuffle
 import theano
+from theano import shared
+import numpy as np
 from AST.Sampler import PreparedAST, generate_samples, build_asts
 from Embeddings.Construct import construct
 from Embeddings.Evaluation import EvaluationSet, process_network, EvaluationSet
@@ -43,7 +46,7 @@ def prepare_net(eval_set: EvaluationSet, params, is_validation, index):
 
 
 # @timing
-def process_batch(batch, params, alpha, decay, is_validation, index):
+def process_batch(batch, params, alpha, decay, is_validation, index, zero_emb):
     total_t_err = 0
     total_a_err = 0
     # samples_size = 1
@@ -51,7 +54,7 @@ def process_batch(batch, params, alpha, decay, is_validation, index):
     for ind, sample in enumerate(batch):
         # print(ind)
         eval_set = prepare_net(sample, params, is_validation, index)
-        ept, err = process_network(eval_set, params, alpha, decay, is_validation)
+        ept, err = process_network(eval_set, params, alpha, decay, is_validation, zero_emb)
         total_t_err += ept
         total_a_err += err
 
@@ -62,11 +65,11 @@ def process_batch(batch, params, alpha, decay, is_validation, index):
 
 
 @safe_run
-def process_batches(batches, params, alpha, decay, is_validation):
+def process_batches(batches, params, alpha, decay, is_validation, zero_emb):
     error_per_ast = 0
     error_per_token = 0
     for i, batch in enumerate(batches):
-        epa, ept = process_batch(batch, params, alpha, decay, is_validation, i)
+        epa, ept = process_batch(batch, params, alpha, decay, is_validation, i, zero_emb)
         # message = ['\t\t|\t{}\t|\t{}\t|\t{}'.format(ept, epa, i)]
         # fprint(message)
         error_per_ast += epa
@@ -87,7 +90,7 @@ def create_batches(data):
 
 
 @safe_run
-def epoch_step(params, epoch_num, retry_num, tparams, batches, train_set_size, decay):
+def epoch_step(params, epoch_num, retry_num, tparams, batches, train_set_size, decay, start_emb, zero_emb):
     shuffle(batches)
     train_set = batches[:train_set_size]
     # validation_set = batches[train_set_size + 1:]
@@ -95,7 +98,7 @@ def epoch_step(params, epoch_num, retry_num, tparams, batches, train_set_size, d
     v_error_per_ast = 0
     v_error_per_token = 0
     fprint(['train set'])
-    result = process_batches(train_set, params, alpha, decay, False)
+    result = process_batches(train_set, params, alpha, decay, False, zero_emb)
     if result is None:
         return
     t_error_per_ast, t_error_per_token = result
@@ -118,6 +121,11 @@ def epoch_step(params, epoch_num, retry_num, tparams, batches, train_set_size, d
         '################'
     ]
     fprint(print_str, log_file)
+    for name, emb in params.embeddings.items():
+        if np.array_equal(emb.eval(), start_emb[name].eval()):
+            fprint(['embedding is equal to start: ', name], log_file)
+            params.embeddings[name] = zero_emb
+
     alpha *= 0.999
     if epoch_num % 100 == 0:
         with open('Embeddings/NewParams/new_params_t' + str(retry_num) + "_ep" + str(epoch_num),
@@ -145,11 +153,14 @@ def reset_batches(batches):
 def train_step(retry_num, batches, train_set_size, token_set, decay):
     tparams = TrainingParams(LEARN_RATE * (1 - MOMENTUM), 0, 0, 0, 0, 0)
     nparams = initialize(token_set)
+    zero_emb = shared(np.zeros(NUM_FEATURES).astype(theano.config.floatX))
+    start_emb = deepcopy(nparams.embeddings)
     reset_batches(batches)
     plot_axes, plot = new_figure(retry_num, EPOCH_IN_RETRY, 1.1)
 
     for train_epoch in range(EPOCH_IN_RETRY):
-        tparams = epoch_step(nparams, train_epoch, retry_num, tparams, batches, train_set_size, decay)
+        tparams = epoch_step(nparams, train_epoch, retry_num, tparams, batches, train_set_size, decay, start_emb,
+                             zero_emb)
         if tparams is None:
             break
         update_figure(plot, plot_axes, train_epoch, tparams.error_to_print, -1)
@@ -157,6 +168,7 @@ def train_step(retry_num, batches, train_set_size, token_set, decay):
     save_to_file(plot, 'retry{}.png'.format(retry_num))
 
 
+@sig_handler
 def main():
     dataset_dir = 'Dataset/'
     with open(dataset_dir + 'ast_file', mode='rb') as ast_file:

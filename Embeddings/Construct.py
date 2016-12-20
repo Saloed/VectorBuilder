@@ -98,13 +98,15 @@ def construct(tokens, params: Parameters, root_token_index, just_validation=Fals
         pos_d = T.std(pos_delta) * 0.5
         neg_d = T.std(neg_delta) * 0.5
 
+        update_params = list(params.w.values()) + list(used_embeddings.values())
+
         # p_len = T.std(pos_forward)
         # n_len = T.std(neg_forward)
+        squared = [T.sqr(p).sum() for p in update_params]
 
-        error = T.nnet.relu(MARGIN + pos_d - neg_d)
+        error = T.nnet.relu(MARGIN + pos_d - neg_d) + l2_param * T.sum(squared)
 
         if not just_validation:
-            update_params = list(params.w.values()) + list(used_embeddings.values())
 
             updates = adadelta(error, update_params)
 

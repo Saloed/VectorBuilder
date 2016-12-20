@@ -48,6 +48,10 @@ def _indexate(nodes) -> list:
     return nodes
 
 
+def get_psi_text(filename, parser):
+    return str(parser.parsePSIText(filename))
+
+
 def build_ast(filename, parser):
     ast = parser.parseFile(filename)
     root_node = _parse_tree(ast)

@@ -14,10 +14,14 @@ class EvaluationSet:
 
 
 # @timing
-def process_network(eval_set: EvaluationSet, params: Parameters, alpha, decay, is_validation):
+def process_network(eval_set: EvaluationSet, params: Parameters, alpha, decay, is_validation, zero_emb):
     emb = list(params.embeddings.values())
+
     change = np.random.randint(0, len(emb) - 1)
     secret = emb[change].eval()
+    while np.array_equal(secret, zero_emb.eval()):
+        change = np.random.randint(0, len(emb) - 1)
+        secret = emb[change].eval()
     if not is_validation:
         train_error = eval_set.back_prop(secret, alpha, decay)
     else:

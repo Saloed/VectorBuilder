@@ -1,3 +1,4 @@
+import signal
 import time
 from traceback import print_tb
 
@@ -29,5 +30,16 @@ def safe_run(f):
             print_tb(exc.__traceback__)
             return None
         return ret
+
+    return wrap
+
+
+def sig_handler(f):
+    def wrap(*args):
+        def handler(signum, frame):
+            raise Exception('Process interrupted')
+
+        signal.signal(signal.SIGINT, handler)
+        return f(*args)
 
     return wrap

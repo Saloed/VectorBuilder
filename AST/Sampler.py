@@ -20,6 +20,27 @@ class ASTSet:
         self.ast_set = asts
 
 
+def build_psi_text(dataset_dir):
+    parser = parser_init()
+    files = os.listdir(dataset_dir)
+    psi_text_file = []
+    for file in files:
+        try:
+            print(file)
+            psi_text = get_psi_text(dataset_dir + file, parser)
+            psi_text_file.append(psi_text)
+        except Exception as ex:
+            print(ex)
+            continue
+    print('end ast building')
+    text = ''
+    for psi_t in psi_text_file:
+        text = text + psi_t + '\n'
+    text *= 20
+    with open(dataset_dir + '../psi_text.data', 'w') as text_file:
+        text_file.write(text)
+
+
 def build_asts(dataset_dir):
     parser = parser_init()
     files = os.listdir(dataset_dir)
@@ -66,11 +87,13 @@ def prepare_ast(full_ast: Nodes):
 
 
 def generate_samples(data, ast_list: list, training_token_index):
-    prepared = prepare_ast(data)
-    for ast in prepared:
-        ast_len = len(ast)
-        training_token = ast[training_token_index]
+    methods = divide_by_methods(data)
+    for m in methods:
+        prepared = prepare_ast(m)
+        for ast in prepared:
+            ast_len = len(ast)
+            training_token = ast[training_token_index]
 
-        assert training_token_index == 0
+            assert training_token_index == 0
 
-        ast_list.append(PreparedAST(ast, training_token, training_token_index, ast_len))
+            ast_list.append(PreparedAST(ast, training_token, training_token_index, ast_len))
