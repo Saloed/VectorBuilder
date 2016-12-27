@@ -165,9 +165,7 @@ def construct_network(nodes: Nodes, parameters: Params, mode: BuildMode, pool_cu
         error = T.neq(T.round(net_forward), target)
 
         if mode == BuildMode.train:
-            params_keys = list(parameters.w.keys()) + list(parameters.b.keys())
-            used_params = [parameters.w[k] for k in params_keys]
-
+            used_params = list(parameters.w.values()) + list(parameters.b.values())
             cost = loss_function(target, net_forward, used_params, True)
             updates = get_updates(cost, used_params)
 
