@@ -26,43 +26,21 @@ Network = namedtuple('Network', ['forward', 'back', 'validation'])
 
 class Params:
     def __init__(self,
-                 w_left, w_right,
-                 w_comb_ae, w_comb_emb,
                  w_conv_root, w_conv_left, w_conv_right,
-                 w_dis_top, w_dis_left, w_dis_right,
-                 w_out,
-                 b_construct,
-                 b_conv, b_dis, b_out, c_out, s_out,
+                 w_hid, w_out,
+                 b_conv, b_hid, b_out,
                  embeddings):
         self.w = {
-            'w_left': w_left,
-            'w_right': w_right,
-
-            'w_comb_ae': w_comb_ae,
-            'w_comb_emb': w_comb_emb,
-
             'w_conv_root': w_conv_root,
             'w_conv_left': w_conv_left,
             'w_conv_right': w_conv_right,
-
-            # 'w_dis_top': w_dis_top,
-            # 'w_dis_left': w_dis_left,
-            # 'w_dis_right': w_dis_right,
-
+            'w_hid': w_hid,
+            'w_out': w_out,
         }
         self.b = {
-            'b_construct': b_construct,
-
             'b_conv': b_conv,
-            # 'b_dis': b_dis,
-
+            'b_hid': b_hid,
+            'b_out': b_out
         }
 
-        self.svm = {
-            'w_out': w_out,
-            'b_out': b_out,
-            # 'c_out': c_out,
-            # 's_out': s_out
-
-        }
         self.embeddings = embeddings
