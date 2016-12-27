@@ -40,7 +40,7 @@ def parse_model():
     saver = tf.train.Saver()
 
     with tf.Session() as sess:
-        saver.restore(sess, "SaveDir/end_model.ckpt-92906301")
+        saver.restore(sess, "SaveDir/end_model.ckpt-76835470")
         emb = w_in.eval(sess)  # type: np.multiarray.ndarray
         convert_to_parameters(emb, storage)
 
@@ -80,6 +80,6 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
-    # parse_model()
+    # main()
+    parse_model()
     # make_train_file('../Dataset/java_files/')

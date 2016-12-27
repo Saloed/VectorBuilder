@@ -1,20 +1,12 @@
-from collections import OrderedDict
+from enum import Enum
 
-import theano.tensor as T
-import theano.tensor.extra_ops
 from lasagne.updates import *
 from theano import function
-from lasagne.objectives import *
-from theano.printing import pydotprint
+
 from AST.Token import Token
-from AST.Tokenizer import Nodes, print_ast, visualize
+from AST.Tokenizer import Nodes
 from NN.Connection import Connection, PoolConnection
 from NN.Layer import *
-from AuthorClassifier.ClassifierParams import *
-from theano.compile.nanguardmode import NanGuardMode
-from enum import Enum
-import theano.gradient as Tg
-from Utils.Wrappers import timing
 
 
 class BuildMode(Enum):
@@ -106,21 +98,21 @@ def build_net(nodes: Nodes, params: Params, pool_cutoff, authors_amount):
         used_embeddings[node.token_type] = emb
         _layers[node.index] = Embedding(emb, "embedding_" + str(node))
 
-    for node in nodes.non_leafs:
-        emb_layer = _layers[node.index]
-        ae_layer = Encoder(params.b['b_construct'], "autoencoder_" + str(node))
-        cmb_layer = Combination("combination_" + str(node))
-        Connection(ae_layer, cmb_layer, params.w['w_comb_ae'])
-        Connection(emb_layer, cmb_layer, params.w['w_comb_emb'])
-        _layers[node.index] = cmb_layer
-
-        for child in node.children:
-            if child.left_rate != 0:
-                Connection(_layers[child.index], ae_layer, params.w['w_left'],
-                           w_coeff=child.left_rate * child.leaf_num / node.leaf_num)
-            if child.right_rate != 0:
-                Connection(_layers[child.index], ae_layer, params.w['w_right'],
-                           w_coeff=child.right_rate * child.leaf_num / node.leaf_num)
+    # for node in nodes.non_leafs:
+    #     emb_layer = _layers[node.index]
+    #     ae_layer = Encoder(params.b['b_construct'], "autoencoder_" + str(node))
+    #     cmb_layer = Combination("combination_" + str(node))
+    #     Connection(ae_layer, cmb_layer, params.w['w_comb_ae'])
+    #     Connection(emb_layer, cmb_layer, params.w['w_comb_emb'])
+    #     _layers[node.index] = cmb_layer
+    #
+    #     for child in node.children:
+    #         if child.left_rate != 0:
+    #             Connection(_layers[child.index], ae_layer, params.w['w_left'],
+    #                        w_coeff=child.left_rate * child.leaf_num / node.leaf_num)
+    #         if child.right_rate != 0:
+    #             Connection(_layers[child.index], ae_layer, params.w['w_right'],
+    #                        w_coeff=child.right_rate * child.leaf_num / node.leaf_num)
 
     conv_layers = []
     pooling_layer = Pooling('pool', NUM_CONVOLUTION)
@@ -170,10 +162,13 @@ def construct_network(nodes: Nodes, parameters: Params, mode: BuildMode, pool_cu
         error = T.neq(T.round(net_forward), target)
 
         if mode == BuildMode.train:
-            params_keys = ['w_conv_left', 'w_conv_right', 'w_conv_root', 'w_comb_ae', 'w_comb_emb']
+            params_keys = ['w_conv_left', 'w_conv_right',
+                           'w_conv_root']  # , 'w_comb_ae', 'w_comb_emb', 'w_left', 'w_right']
             used_params = [parameters.w[k] for k in params_keys]
             params_keys.append('b_conv')
             used_params.append(parameters.b['b_conv'])
+            # params_keys.append('b_construct')
+            # used_params.append(parameters.b['b_construct'])
             used_params.extend(parameters.svm.values())
 
             cost = loss_function(target, net_forward, used_params, True)
