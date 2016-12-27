@@ -117,10 +117,13 @@ def build_net(nodes: Nodes, params: Params, pool_cutoff, authors_amount):
     conv_layers = []
     pooling_layer = Pooling('pool', NUM_CONVOLUTION)
     convolve_creator(nodes.root_node, pooling_layer, conv_layers, _layers, params)
-    out_layer = FullConnected(params.svm['b_out'], T.nnet.sigmoid, name='out_layer', feature_amount=1)
-    Connection(pooling_layer, out_layer, params.svm['w_out'])
+    hid_layer = FullConnected(params.b['b_hid'], T.tanh, name='hidden_layer', feature_amount=NUM_HIDDEN)
+    out_layer = FullConnected(params.b['b_out'], T.nnet.sigmoid, name='out_layer', feature_amount=1)
+    Connection(pooling_layer, hid_layer, params.w['w_hid'])
+    Connection(hid_layer, out_layer, params.w['w_out'])
     layers = _layers + conv_layers
     layers.append(pooling_layer)
+    layers.append(hid_layer)
     layers.append(out_layer)
     return layers, used_embeddings, pooling_layer
 
@@ -162,14 +165,8 @@ def construct_network(nodes: Nodes, parameters: Params, mode: BuildMode, pool_cu
         error = T.neq(T.round(net_forward), target)
 
         if mode == BuildMode.train:
-            params_keys = ['w_conv_left', 'w_conv_right',
-                           'w_conv_root']  # , 'w_comb_ae', 'w_comb_emb', 'w_left', 'w_right']
+            params_keys = list(parameters.w.keys()) + list(parameters.b.keys())
             used_params = [parameters.w[k] for k in params_keys]
-            params_keys.append('b_conv')
-            used_params.append(parameters.b['b_conv'])
-            # params_keys.append('b_construct')
-            # used_params.append(parameters.b['b_construct'])
-            used_params.extend(parameters.svm.values())
 
             cost = loss_function(target, net_forward, used_params, True)
             updates = get_updates(cost, used_params)

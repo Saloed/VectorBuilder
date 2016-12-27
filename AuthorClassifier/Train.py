@@ -1,21 +1,16 @@
 import _pickle as P
-import gc
-import sys
-from collections import namedtuple
-from copy import deepcopy
-from itertools import groupby
-from random import randint, shuffle
 import math
+import sys
+from random import randint, shuffle
+
+import gc
 import numpy as np
 import theano
-import theano.gradient as Tg
-from AST.Tokenizer import print_ast
-from AuthorClassifier.ClassifierParams import NUM_RETRY, NUM_EPOCH, clip_const, Params
 
 from AST.GitAuthor import get_repo_methods_with_authors
 from AuthorClassifier.Builder import construct_from_nodes, BuildMode
-from AuthorClassifier.InitParams import init_params, reset_params
-from Utils.Visualization import new_figure, update_figure, save_to_file
+from AuthorClassifier.ClassifierParams import NUM_RETRY, NUM_EPOCH
+from AuthorClassifier.InitParams import init_params
 from Utils.Wrappers import safe_run, timing
 
 theano.config.floatX = 'float32'
