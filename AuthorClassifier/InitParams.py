@@ -1,7 +1,7 @@
-import numpy as np
-import theano
 import _pickle as P
 
+import numpy as np
+import theano
 from numpy.random.mtrand import RandomState
 from theano import shared
 
@@ -66,52 +66,16 @@ def init_params(all_authors, emb_path):
     out_features = len(all_authors)
     embeddings = e_params.embeddings
 
-    # b_construct = e_params.b_construct
-    #
-    # w_left = e_params.w['w_left']
-    # w_right = e_params.w['w_right']
-
-    # w_left = rand_weight(NUM_FEATURES, NUM_FEATURES, 'w_left')
-    # w_right = rand_weight(NUM_FEATURES, NUM_FEATURES, 'w_right')
-
-    # b_construct = rand_bias(NUM_FEATURES, 'b_construct')
-
-    # diag_matrix = (np.eye(NUM_FEATURES) / 2).reshape((NUM_FEATURES, NUM_FEATURES))
-
-    # w_comb_ae = shared(np.asarray(diag_matrix, dtype=theano.config.floatX), 'w_comb_ae')
-    # w_comb_emb = shared(np.asarray(diag_matrix, dtype=theano.config.floatX), 'w_comb_emb')
-    # w_comb_ae = rand_weight(NUM_FEATURES, NUM_FEATURES, 'w_comb_ae')
-    # w_comb_emb = rand_weight(NUM_FEATURES, NUM_FEATURES, 'w_comb_emb')
-
     w_conv_root = rand_weight(NUM_CONVOLUTION, NUM_FEATURES, 'w_conv_root')
     w_conv_left = rand_weight(NUM_CONVOLUTION, NUM_FEATURES, 'w_conv_left')
     w_conv_right = rand_weight(NUM_CONVOLUTION, NUM_FEATURES, 'w_conv_right')
-
-    # w_dis_top = rand_weight(NUM_DISCRIMINATIVE, NUM_CONVOLUTION, 'w_dis_top')
-    # w_dis_left = rand_weight(NUM_DISCRIMINATIVE, NUM_CONVOLUTION, 'w_dis_left')
-    # w_dis_right = rand_weight(NUM_DISCRIMINATIVE, NUM_CONVOLUTION, 'w_dis_right')
-
-    w_out = rand_weight(1, NUM_CONVOLUTION, 'w_out')
+    w_hid = rand_weight(NUM_HIDDEN, NUM_CONVOLUTION, 'w_hid')
+    w_out = rand_weight(1, NUM_HIDDEN, 'w_out')
 
     b_conv = rand_bias(NUM_CONVOLUTION, 'b_conv')
-
-    # b_dis = rand_bias(NUM_DISCRIMINATIVE, 'b_dis')
-    #
+    b_hid = rand_bias(NUM_HIDDEN, 'b_hid')
     b_out = rand_bias(1, 'b_out')
-    # c_out = rand_bias(NUM_CONVOLUTION, 'c_out')
-    # s_out = rand_bias(NUM_CONVOLUTION, 's_out')
 
-    return Params(None, None, None, None,
-                  w_conv_root, w_conv_left, w_conv_right,
-                  None, None, None,
-                  w_out, None, b_conv, None, b_out,
-                  None, None, embeddings)
-
-    # return Params(w_left, w_right,
-    #               w_comb_ae, w_comb_emb,
-    #               w_conv_root, w_conv_left, w_conv_right,
-    #               w_dis_top, w_dis_left, w_dis_right,
-    #               w_out,
-    #               b_construct,
-    #               b_conv, b_dis, b_out, c_out, s_out,
-    #               embeddings)
+    return Params(w_conv_root, w_conv_left, w_conv_right,
+                  w_hid, w_out, b_conv, b_hid, b_out,
+                  embeddings)
