@@ -117,7 +117,7 @@ def build_net(nodes: Nodes, params: Params, pool_cutoff, authors_amount):
     conv_layers = []
     pooling_layer = Pooling('pool', NUM_CONVOLUTION)
     convolve_creator(nodes.root_node, pooling_layer, conv_layers, _layers, params)
-    hid_layer = FullConnected(params.b['b_hid'], T.tanh, name='hidden_layer', feature_amount=NUM_HIDDEN)
+    hid_layer = FullConnected(params.b['b_hid'], T.nnet.softplus, name='hidden_layer', feature_amount=NUM_HIDDEN)
     out_layer = FullConnected(params.b['b_out'], T.nnet.sigmoid, name='out_layer', feature_amount=1)
     Connection(pooling_layer, hid_layer, params.w['w_hid'])
     Connection(hid_layer, out_layer, params.w['w_out'])

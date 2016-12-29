@@ -1,9 +1,9 @@
 import _pickle as P
+import gc
 import math
 import sys
 from random import randint, shuffle
 
-import gc
 import numpy as np
 import theano
 
@@ -11,6 +11,9 @@ from AST.GitAuthor import get_repo_methods_with_authors
 from AuthorClassifier.Builder import construct_from_nodes, BuildMode
 from AuthorClassifier.ClassifierParams import NUM_RETRY, NUM_EPOCH
 from AuthorClassifier.InitParams import init_params
+from Utils.Visualization import new_figure
+from Utils.Visualization import save_to_file
+from Utils.Visualization import update_figure
 from Utils.Wrappers import safe_run, timing
 
 theano.config.floatX = 'float32'
@@ -143,15 +146,15 @@ def train_step(retry_num, batches, test_set, authors, nparams):
     reset_batches(batches)
     reset_batches(test_set)
 
-    #    plot_axes, plot = new_figure(retry_num, NUM_EPOCH, 1)  # len(authors) + 1)
+    plot_axes, plot = new_figure(retry_num, NUM_EPOCH, 1)  # len(authors) + 1)
     for train_epoch in range(NUM_EPOCH):
         error = epoch_step(nparams, train_epoch, retry_num, batches, test_set, authors)
         if error is None:
             break
         verr, terr = error
-        #      update_figure(plot, plot_axes, train_epoch, verr, terr)
+        update_figure(plot, plot_axes, train_epoch, verr, terr)
 
-        #  save_to_file(plot, 'retry{}.png'.format(retry_num))
+    save_to_file(plot, 'retry{}.png'.format(retry_num))
 
 
 def collapse_authors(authors: list):
@@ -284,7 +287,7 @@ def main():
     authors, r_index = collapse_authors(all_authors)
     all_batches = generate_batches(dataset.methods_with_authors, r_index)
     batches, r_index, authors = group_batches(all_batches, r_index, authors)
-    train_set, test_set = divide_data_set(batches, 120, 50)
+    train_set, test_set = divide_data_set(batches, 100, 50)
     nparams = init_params(authors, 'AuthorClassifier/emb_params')
     for train_retry in range(NUM_RETRY):
         train_step(train_retry, train_set, test_set, authors, nparams)
