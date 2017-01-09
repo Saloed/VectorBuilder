@@ -13,7 +13,7 @@ from AST.Tokenizer import print_ast
 from AST.GitAuthor import get_repo_methods_with_authors
 
 from AuthorClassifier.ClassifierParams import NUM_RETRY, NUM_EPOCH
-from AuthorClassifier.InitParams import init_params, reset_params
+from AuthorClassifier.InitParams import init_params
 
 from NewAuthorClassifier.ExtremelyNewBuilder import construct_from_nodes, BuildMode
 from NewAuthorClassifier.ExtremelyNewBuilder import build_parts

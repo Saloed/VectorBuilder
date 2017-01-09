@@ -21,7 +21,7 @@ BATCH_SIZE = 1
 RANDOM_RANGE = 0.02
 
 NUM_RETRY = 200
-NUM_EPOCH = 1500
+NUM_EPOCH = 15000
 
 Network = namedtuple('Network', ['forward', 'back', 'validation'])
 
