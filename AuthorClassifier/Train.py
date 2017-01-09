@@ -189,11 +189,12 @@ def group_batches(data, r_index, authors):
     for d in data:
         if d.index not in indexed:
             indexed[d.index] = []
-        indexed[d.index].append(d)
+        if len(d.ast.all_nodes) > 100:
+            indexed[d.index].append(d)
 
     for k in indexed.keys():
         batches = indexed[k]
-        if len(batches) < 700:
+        if len(batches) < 600:
             for b in batches:
                 if b.author in r_index:
                     r_index[b.author] = None
