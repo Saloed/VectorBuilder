@@ -74,8 +74,8 @@ def build_vectors(authors):
 
 @timing
 def process_set(batches, nparams, need_back, authors):
-    err = 0
-    rerr = 0
+    err = []
+    rerr = []
     size = len(batches)
     author_amount = len(authors)
     reverse_index = build_vectors(authors)
@@ -87,20 +87,20 @@ def process_set(batches, nparams, need_back, authors):
                 batch.back = construct_from_nodes(batch.ast, nparams, BuildMode.train, author_amount)
             terr, e, res = batch.back(author)
             # fprint([batch.author, author, res, terr, e])
-            rerr += e
-            err += terr
+            rerr.append(e)
+            err.append(terr)
         else:
             if batch.valid is None:
                 fprint(['build {}'.format(i)])
                 batch.valid = construct_from_nodes(batch.ast, nparams, BuildMode.validation, author_amount)
             terr, e, res = batch.valid(author)
             # fprint([batch.author, author, res, terr, e])
-            rerr += e
-            err += terr
+            rerr.append(e)
+            err.append(terr)
         # fprint([nparams.w['w_conv_root'].eval(), nparams.b['b_conv'].eval()])
         if math.isnan(terr):
             raise Exception('Error is NAN. Start new retry')
-    return err / size, rerr / size
+    return err, rerr
 
 
 @safe_run
@@ -119,8 +119,8 @@ def epoch_step(nparams, train_epoch, retry_num, batches, test_set, authors):
 
     print_str = [
         'end of epoch {0} retry {1}'.format(train_epoch, retry_num),
-        'train\t|\t{}|\t{}'.format(tr_err, tr_rerr),
-        'test\t|\t{}|\t{}'.format(test_err, test_rerr),
+        'train | mean {0:.4f} | std {1:.4f} | max {2:.4f} | percent {3:.2f}'.format(np.mean(tr_err),np.std(tr_err),np.max(tr_err),np.mean(tr_rerr)),
+        'test  | mean {0:.4f} | std {1:.4f} | max {2:.4f} | percent {3:.2f}'.format(np.mean(test_err),np.std(test_err),np.max(test_err),np.mean(test_rerr)),
         '################'
     ]
     fprint(print_str, log_file)
@@ -130,7 +130,7 @@ def epoch_step(nparams, train_epoch, retry_num, batches, test_set, authors):
                   mode='wb') as new_params:
             P.dump(nparams, new_params)
 
-    return test_err, tr_err
+    return np.mean(test_err), np.mean(tr_err)
 
 
 def reset_batches(batches):
@@ -275,8 +275,6 @@ def test():
                                                                             err / size))
 
 
-# 150 train 50 test  12181 mem  180 sec test / more then 20 minutes train build time   1.034 sec avg epoch time
-
 def main():
     with open('Dataset/author_file', 'rb') as f:
         dataset = P.load(f)
@@ -288,7 +286,7 @@ def main():
     authors, r_index = collapse_authors(all_authors)
     all_batches = generate_batches(dataset.methods_with_authors, r_index)
     batches, r_index, authors = group_batches(all_batches, r_index, authors)
-    train_set, test_set = divide_data_set(batches, 100, 50)
+    train_set, test_set = divide_data_set(batches, 2, 2)
     nparams = init_params(authors, 'AuthorClassifier/emb_params')
     for train_retry in range(NUM_RETRY):
         train_step(train_retry, train_set, test_set, authors, nparams)

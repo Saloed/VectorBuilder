@@ -3,7 +3,7 @@ from collections import namedtuple
 NUM_FEATURES = 100
 
 margin = 1
-learn_rate = 0.0025  # 0.0001
+learn_rate = 0.0020  # 0.0001
 beta = .0001
 momentum = 0.1
 l2_param = 5.e-5
@@ -21,7 +21,7 @@ BATCH_SIZE = 1
 RANDOM_RANGE = 0.02
 
 NUM_RETRY = 200
-NUM_EPOCH = 15000
+NUM_EPOCH = 5000
 
 Network = namedtuple('Network', ['forward', 'back', 'validation'])
 
