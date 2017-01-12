@@ -3,7 +3,7 @@ from collections import namedtuple
 NUM_FEATURES = 100
 
 margin = 1
-learn_rate = 0.0020  # 0.0001
+learn_rate = 0.0025  # 0.0001
 beta = .0001
 momentum = 0.1
 l2_param = 5.e-5

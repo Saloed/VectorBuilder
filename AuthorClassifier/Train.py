@@ -103,7 +103,7 @@ def process_set(batches, nparams, need_back, authors):
     return err, rerr
 
 
-@safe_run
+# @safe_run
 def epoch_step(nparams, train_epoch, retry_num, batches, test_set, authors):
     shuffle(batches)
     fprint(['train set'])
@@ -119,8 +119,11 @@ def epoch_step(nparams, train_epoch, retry_num, batches, test_set, authors):
 
     print_str = [
         'end of epoch {0} retry {1}'.format(train_epoch, retry_num),
-        'train | mean {0:.4f} | std {1:.4f} | max {2:.4f} | percent {3:.2f}'.format(np.mean(tr_err),np.std(tr_err),np.max(tr_err),np.mean(tr_rerr)),
-        'test  | mean {0:.4f} | std {1:.4f} | max {2:.4f} | percent {3:.2f}'.format(np.mean(test_err),np.std(test_err),np.max(test_err),np.mean(test_rerr)),
+        'train | mean {0:.4f} | std {1:.4f} | max {2:.4f} | percent {3:.2f}'.format(np.mean(tr_err), np.std(tr_err),
+                                                                                    np.max(tr_err), np.mean(tr_rerr)),
+        'test  | mean {0:.4f} | std {1:.4f} | max {2:.4f} | percent {3:.2f}'.format(np.mean(test_err), np.std(test_err),
+                                                                                    np.max(test_err),
+                                                                                    np.mean(test_rerr)),
         '################'
     ]
     fprint(print_str, log_file)
@@ -286,7 +289,7 @@ def main():
     authors, r_index = collapse_authors(all_authors)
     all_batches = generate_batches(dataset.methods_with_authors, r_index)
     batches, r_index, authors = group_batches(all_batches, r_index, authors)
-    train_set, test_set = divide_data_set(batches, 2, 2)
+    train_set, test_set = divide_data_set(batches, 80, 40)
     nparams = init_params(authors, 'AuthorClassifier/emb_params')
     for train_retry in range(NUM_RETRY):
         train_step(train_retry, train_set, test_set, authors, nparams)

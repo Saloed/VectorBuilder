@@ -137,7 +137,7 @@ def loss_function(target, net_frwd, params, need_l2: bool):
 
 
 def get_updates(loss, params):
-    updates = sgd(loss, params, 0.001)
+    updates = sgd(loss, params, learn_rate)
     for k, u in updates.items():
         updates[k] = T.clip(u, -clip_const, clip_const)
     return updates
@@ -166,7 +166,7 @@ def construct_network(nodes: Nodes, parameters: Params, mode: BuildMode, pool_cu
 
         if mode == BuildMode.train:
             used_params = list(parameters.w.values()) + list(parameters.b.values())
-            cost = loss_function(target, net_forward, used_params, True)
+            cost = loss_function(target, net_forward, list(parameters.w.values()), True)
             updates = get_updates(cost, used_params)
 
             return function([target], [cost, error, net_forward], updates=updates)
