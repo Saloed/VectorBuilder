@@ -15,6 +15,13 @@ class BuildMode(Enum):
     test = 'test'
 
 
+class NetLoss:
+    def __init__(self, net_forward, loss, error):
+        self.net_forward = net_forward
+        self.loss = loss
+        self.error = error
+
+
 def compute_rates(root_node: Token):
     if not root_node.is_leaf:
         len_children = len(root_node.children)
@@ -29,15 +36,12 @@ def compute_rates(root_node: Token):
 
 
 # @timing
-def construct_from_nodes(ast: Nodes, parameters: Params, mode: BuildMode, author_amount):
+def construct_from_nodes(ast: Nodes, parameters: Params, mode: BuildMode, target):
     # visualize(ast.root_node, 'ast.png')
     nodes = ast.all_nodes
     compute_rates(ast.root_node)
-    _, _, avg_depth = compute_leaf_num(ast.root_node, nodes)
-    avg_depth *= .6
-    if avg_depth < 1:        avg_depth = 1
-
-    return construct_network(ast, parameters, mode, avg_depth, author_amount)
+    compute_leaf_num(ast.root_node, nodes)
+    return construct_network(ast, parameters, mode, target)
 
 
 def compute_leaf_num(root, nodes, depth=0):
@@ -87,7 +91,7 @@ def convolve_creator(root_node, pooling_layer, conv_layers, layers, params):
         convolve_creator(child, pooling_layer, conv_layers, layers, params)
 
 
-def build_net(nodes: Nodes, params: Params, pool_cutoff, authors_amount):
+def build_net(nodes: Nodes, params: Params):
     used_embeddings = {}
     nodes_amount = len(nodes.all_nodes)
 
@@ -143,14 +147,8 @@ def get_updates(loss, params):
     return updates
 
 
-def construct_network(nodes: Nodes, parameters: Params, mode: BuildMode, pool_cutoff, author_amount):
-    parameters_amount = {}
-    for k in parameters.w.keys():
-        parameters_amount[k] = 0
-    for k in parameters.b.keys():
-        parameters_amount[k] = 0
-
-    net, used_embeddings, dis_layer = build_net(nodes, parameters, pool_cutoff, author_amount)
+def construct_network(nodes: Nodes, parameters: Params, mode: BuildMode, target):
+    net, used_embeddings, dis_layer = build_net(nodes, parameters)
 
     def f_builder(layer: Layer):
         if layer.forward is None:
@@ -161,24 +159,16 @@ def construct_network(nodes: Nodes, parameters: Params, mode: BuildMode, pool_cu
             layer.build_forward()
 
     def back_propagation(net_forward):
-        target = T.iscalar('target')
         error = T.neq(T.round(net_forward), target)
-
-        if mode == BuildMode.train:
-            used_params = list(parameters.w.values()) + list(parameters.b.values())
-            cost = loss_function(target, net_forward, list(parameters.w.values()), True)
-            updates = get_updates(cost, used_params)
-
-            return function([target], [cost, error, net_forward], updates=updates)
+        if target == 1:
+            loss = -T.log(net_forward[0] + 1.e-10)
         else:
-            cost = loss_function(target, net_forward, None, False)
-            return function([target], [cost, error, net_forward])
+            loss = -T.log(1 - net_forward[0] + 1.e-10)
+        return NetLoss(net_forward, loss, error)
 
     f_builder(net[-1])
 
     net_forward = net[-1].forward
-    tbcnn_out = dis_layer.forward
-
     # pydotprint(net_forward,'net_fwd.jpg',format='jpg')
     # raise Exception('dont need more')
 

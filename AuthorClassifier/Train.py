@@ -6,10 +6,14 @@ from random import randint, shuffle
 
 import numpy as np
 import theano
+import theano.tensor as T
+from lasagne.updates import sgd
+from theano import function
 
 from AST.GitAuthor import get_repo_methods_with_authors
+from AuthorClassifier.Builder import NetLoss
 from AuthorClassifier.Builder import construct_from_nodes, BuildMode
-from AuthorClassifier.ClassifierParams import NUM_RETRY, NUM_EPOCH
+from AuthorClassifier.ClassifierParams import NUM_RETRY, NUM_EPOCH, l2_param
 from AuthorClassifier.InitParams import init_params
 from Utils.Visualization import new_figure
 from Utils.Visualization import save_to_file
@@ -33,7 +37,6 @@ class Batch:
         self.ast = ast
         self.author = author
         self.index = index
-        self.valid = None
         self.back = None
 
     def __str__(self):
@@ -63,77 +66,34 @@ def build_vectors(authors):
     # assuming that we have only two authors
     for uauthor in authors:
         for author in uauthor[1]:
-            # one_hot = np.ones(size, dtype='float32')
-            # one_hot *= -1.0
-            # one_hot = np.zeros(size, dtype='int32')
-            # one_hot[uauthor[0]] = 1
-            # index[author] = one_hot
             index[author] = uauthor[0]
     return index
 
 
 @timing
-def process_set(batches, nparams, need_back, authors):
-    err = []
-    rerr = []
-    size = len(batches)
-    author_amount = len(authors)
-    reverse_index = build_vectors(authors)
-    for i, batch in enumerate(batches):
-        author = reverse_index[batch.author]
-        if need_back:
-            if batch.back is None:
-                fprint(['build {}'.format(i)])
-                batch.back = construct_from_nodes(batch.ast, nparams, BuildMode.train, author_amount)
-            terr, e, res = batch.back(author)
-            # fprint([batch.author, author, res, terr, e])
-            rerr.append(e)
-            err.append(terr)
-        else:
-            if batch.valid is None:
-                fprint(['build {}'.format(i)])
-                batch.valid = construct_from_nodes(batch.ast, nparams, BuildMode.validation, author_amount)
-            terr, e, res = batch.valid(author)
-            # fprint([batch.author, author, res, terr, e])
-            rerr.append(e)
-            err.append(terr)
-        # fprint([nparams.w['w_conv_root'].eval(), nparams.b['b_conv'].eval()])
-        if math.isnan(terr):
-            raise Exception('Error is NAN. Start new retry')
-    return err, rerr
-
-
-# @safe_run
-def epoch_step(nparams, train_epoch, retry_num, batches, test_set, authors):
-    shuffle(batches)
-    fprint(['train set'])
-    result = process_set(batches, nparams, True, authors)
-    if result is None:
-        return
-    tr_err, tr_rerr = result
-    fprint(['test set'])
-    result = process_set(test_set, nparams, False, authors)
-    if result is None:
-        return
-    test_err, test_rerr = result
+@safe_run
+def epoch_step(train_epoch, retry_num, train_fun, test_fun, nparams):
+    tr_loss, tr_std, tr_max, tr_err = train_fun()
+    te_loss, te_std, te_max, te_err = test_fun()
 
     print_str = [
         'end of epoch {0} retry {1}'.format(train_epoch, retry_num),
-        'train | mean {0:.4f} | std {1:.4f} | max {2:.4f} | percent {3:.2f}'.format(np.mean(tr_err), np.std(tr_err),
-                                                                                    np.max(tr_err), np.mean(tr_rerr)),
-        'test  | mean {0:.4f} | std {1:.4f} | max {2:.4f} | percent {3:.2f}'.format(np.mean(test_err), np.std(test_err),
-                                                                                    np.max(test_err),
-                                                                                    np.mean(test_rerr)),
+        'train | mean {0:.4f} | std {1:.4f} | max {2:.4f} | percent {3:.2f}'.format(tr_loss, tr_std,
+                                                                                    tr_max, tr_err),
+        'test  | mean {0:.4f} | std {1:.4f} | max {2:.4f} | percent {3:.2f}'.format(te_loss, te_std,
+                                                                                    te_max, te_err),
         '################'
     ]
     fprint(print_str, log_file)
+    if math.isnan(tr_loss) or math.isnan(te_loss):
+        raise Exception('Error is NAN. Start new retry')
 
     if train_epoch % 100 == 0:
         with open('AuthorClassifier/NewParams/new_params_t' + str(retry_num) + "_ep" + str(train_epoch),
                   mode='wb') as new_params:
             P.dump(nparams, new_params)
 
-    return np.mean(test_err), np.mean(tr_err)
+    return te_loss, tr_loss
 
 
 def reset_batches(batches):
@@ -143,15 +103,54 @@ def reset_batches(batches):
     gc.collect()
 
 
-@safe_run
-def train_step(retry_num, batches, test_set, authors, nparams):
+def init_set(train_set, test_set, nparams, r_index):
+    def build_all(batches):
+        for i, batch in enumerate(batches):
+            author = r_index[batch.author]
+            fprint(['build {}'.format(i)])
+            batch.back = construct_from_nodes(batch.ast, nparams, BuildMode.train, author)  # type: NetLoss
+
+    def get_errors(batches, need_l2, l2):
+        loss = [b.back.loss for b in batches]
+        error = [b.back.error for b in batches]
+        train_loss = T.mean(loss)
+        if need_l2: train_loss = train_loss + l2
+        train_err = T.mean(error)
+        train_loss_std = T.std(loss)
+        train_max_loss = T.max(loss)
+
+        return train_loss, train_loss_std, train_max_loss, train_err
+
+    fprint(['train set'])
+    build_all(train_set)
+    weights = list(nparams.w.values())
+    bias = list(nparams.b.values())
+    squared = [T.sqr(p).sum() for p in weights]
+    l2 = l2_param * T.sum(squared)
+    train_loss, train_loss_std, train_max_loss, train_err = get_errors(train_set, True, l2)
+    updates = sgd(train_loss, weights + bias, 0.02)
+    train_fun = function([], [train_loss, train_loss_std, train_max_loss, train_err], updates=updates)
+
+    fprint(['test set'])
+    build_all(test_set)
+    train_loss, train_loss_std, train_max_loss, train_err = get_errors(test_set, False, None)
+    test_fun = function([], [train_loss, train_loss_std, train_max_loss, train_err])
+
+    return train_fun, test_fun
+
+
+# @safe_run
+def train_step(retry_num, train_set, test_set, authors, nparams):
     nparams = init_params(authors, 'AuthorClassifier/emb_params')
-    reset_batches(batches)
+    reset_batches(train_set)
     reset_batches(test_set)
+    r_index = build_vectors(authors)
+    train_fun, test_fun = init_set(train_set, test_set, nparams, r_index)
 
     plot_axes, plot = new_figure(retry_num, NUM_EPOCH, 1)  # len(authors) + 1)
+
     for train_epoch in range(NUM_EPOCH):
-        error = epoch_step(nparams, train_epoch, retry_num, batches, test_set, authors)
+        error = epoch_step(train_epoch, retry_num, train_fun, test_fun, nparams)
         if error is None:
             break
         verr, terr = error
@@ -289,7 +288,7 @@ def main():
     authors, r_index = collapse_authors(all_authors)
     all_batches = generate_batches(dataset.methods_with_authors, r_index)
     batches, r_index, authors = group_batches(all_batches, r_index, authors)
-    train_set, test_set = divide_data_set(batches, 80, 40)
+    train_set, test_set = divide_data_set(batches, 10, 5)
     nparams = init_params(authors, 'AuthorClassifier/emb_params')
     for train_retry in range(NUM_RETRY):
         train_step(train_retry, train_set, test_set, authors, nparams)
