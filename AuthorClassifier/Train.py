@@ -78,10 +78,10 @@ def epoch_step(train_epoch, retry_num, train_fun, test_fun, nparams):
 
     print_str = [
         'end of epoch {0} retry {1}'.format(train_epoch, retry_num),
-        'train | mean {0:.4f} | std {1:.4f} | max {2:.4f} | percent {3:.2f}'.format(tr_loss, tr_std,
-                                                                                    tr_max, tr_err),
-        'test  | mean {0:.4f} | std {1:.4f} | max {2:.4f} | percent {3:.2f}'.format(te_loss, te_std,
-                                                                                    te_max, te_err),
+        'train | mean {0:.4f} | std {1:.4f} | max {2:.4f} | percent {3:.2f}'.format(float(tr_loss), float(tr_std),
+                                                                                    float(tr_max), float(tr_err)),
+        'test  | mean {0:.4f} | std {1:.4f} | max {2:.4f} | percent {3:.2f}'.format(float(te_loss), float(te_std),
+                                                                                    float(te_max), float(te_err)),
         '################'
     ]
     fprint(print_str, log_file)
@@ -113,13 +113,13 @@ def init_set(train_set, test_set, nparams, r_index):
     def get_errors(batches, need_l2, l2):
         loss = [b.back.loss for b in batches]
         error = [b.back.error for b in batches]
-        train_loss = T.mean(loss)
-        if need_l2: train_loss = train_loss + l2
-        train_err = T.mean(error)
-        train_loss_std = T.std(loss)
-        train_max_loss = T.max(loss)
+        cost = T.mean(loss)
+        if need_l2: cost = cost + l2
+        err = T.mean(error)
+        max_loss = T.max(loss)
+        loss_std = T.std(T.as_tensor_variable(loss))
 
-        return train_loss, train_loss_std, train_max_loss, train_err
+        return cost, loss_std, max_loss, err
 
     fprint(['train set'])
     build_all(train_set)
@@ -133,8 +133,8 @@ def init_set(train_set, test_set, nparams, r_index):
 
     fprint(['test set'])
     build_all(test_set)
-    train_loss, train_loss_std, train_max_loss, train_err = get_errors(test_set, False, None)
-    test_fun = function([], [train_loss, train_loss_std, train_max_loss, train_err])
+    test_loss, test_loss_std, test_max_loss, test_err = get_errors(test_set, False, None)
+    test_fun = function([], [test_loss, test_loss_std, test_max_loss, test_err])
 
     return train_fun, test_fun
 
@@ -288,7 +288,7 @@ def main():
     authors, r_index = collapse_authors(all_authors)
     all_batches = generate_batches(dataset.methods_with_authors, r_index)
     batches, r_index, authors = group_batches(all_batches, r_index, authors)
-    train_set, test_set = divide_data_set(batches, 10, 5)
+    train_set, test_set = divide_data_set(batches, 80, 40)
     nparams = init_params(authors, 'AuthorClassifier/emb_params')
     for train_retry in range(NUM_RETRY):
         train_step(train_retry, train_set, test_set, authors, nparams)
