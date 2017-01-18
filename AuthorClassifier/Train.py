@@ -13,7 +13,7 @@ from theano import function
 from AST.GitAuthor import get_repo_methods_with_authors
 from AuthorClassifier.Builder import NetLoss
 from AuthorClassifier.Builder import construct_from_nodes, BuildMode
-from AuthorClassifier.ClassifierParams import NUM_RETRY, NUM_EPOCH, l2_param
+from AuthorClassifier.ClassifierParams import NUM_RETRY, NUM_EPOCH, l2_param, BATCH_SIZE
 from AuthorClassifier.InitParams import init_params
 from Utils.Visualization import new_figure
 from Utils.Visualization import save_to_file
@@ -73,11 +73,23 @@ def build_vectors(authors):
 @timing
 @safe_run
 def epoch_step(train_epoch, retry_num, train_fun, test_fun, nparams):
-    tr_loss, tr_std, tr_max, tr_err = train_fun()
+    tr_res = ([], [], [], [])
+    for fun in train_fun:
+        loss, loss_std, max_loss, err = fun()
+        tr_res[0].append(float(loss))
+        tr_res[1].append(float(loss_std))
+        tr_res[2].append(float(max_loss))
+        tr_res[3].append(float(err))
+
+    tr_loss = np.mean(tr_res[0])
+    tr_std = np.mean(tr_res[1])
+    tr_max = np.max(tr_res[2])
+    tr_err = np.mean(tr_res[3])
+
     te_loss, te_std, te_max, te_err = test_fun()
 
     print_str = [
-        'end of epoch {0} retry {1}'.format(train_epoch, retry_num),
+        'epoch {0} retry {1}'.format(train_epoch, retry_num),
         'train | mean {0:.4f} | std {1:.4f} | max {2:.4f} | percent {3:.2f}'.format(float(tr_loss), float(tr_std),
                                                                                     float(tr_max), float(tr_err)),
         'test  | mean {0:.4f} | std {1:.4f} | max {2:.4f} | percent {3:.2f}'.format(float(te_loss), float(te_std),
@@ -127,9 +139,15 @@ def init_set(train_set, test_set, nparams, r_index):
     bias = list(nparams.b.values())
     squared = [T.sqr(p).sum() for p in weights]
     l2 = l2_param * T.sum(squared)
-    train_loss, train_loss_std, train_max_loss, train_err = get_errors(train_set, True, l2)
-    updates = sgd(train_loss, weights + bias, 0.02)
-    train_fun = function([], [train_loss, train_loss_std, train_max_loss, train_err], updates=updates)
+
+    batches = [train_set[i:i + BATCH_SIZE] for i in range(0, len(train_set), BATCH_SIZE)]
+
+    def build_batch(batch):
+        train_loss, train_loss_std, train_max_loss, train_err = get_errors(batch, True, l2)
+        updates = sgd(train_loss, weights + bias, 0.02)
+        return function([], [train_loss, train_loss_std, train_max_loss, train_err], updates=updates)
+
+    train_fun = [build_batch(b) for b in batches]
 
     fprint(['test set'])
     build_all(test_set)
