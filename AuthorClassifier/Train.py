@@ -13,7 +13,7 @@ from theano import function
 from AST.GitAuthor import get_repo_methods_with_authors
 from AuthorClassifier.Builder import NetLoss
 from AuthorClassifier.Builder import construct_from_nodes, BuildMode
-from AuthorClassifier.ClassifierParams import NUM_RETRY, NUM_EPOCH, l2_param, BATCH_SIZE
+from AuthorClassifier.ClassifierParams import NUM_RETRY, NUM_EPOCH, l2_param, BATCH_SIZE, learn_rate
 from AuthorClassifier.InitParams import init_params
 from Utils.Visualization import new_figure
 from Utils.Visualization import save_to_file
@@ -70,23 +70,26 @@ def build_vectors(authors):
     return index
 
 
-@timing
 @safe_run
 def epoch_step(train_epoch, retry_num, train_fun, test_fun, nparams):
-    tr_res = ([], [], [], [])
-    for fun in train_fun:
-        loss, loss_std, max_loss, err = fun()
-        tr_res[0].append(float(loss))
-        tr_res[1].append(float(loss_std))
-        tr_res[2].append(float(max_loss))
-        tr_res[3].append(float(err))
+    @timing
+    def process_set(set_fun):
+        res = ([], [], [], [])
+        for fun in set_fun:
+            loss, loss_std, max_loss, err = fun()
+            res[0].append(float(loss))
+            res[1].append(float(loss_std))
+            res[2].append(float(max_loss))
+            res[3].append(float(err))
+        loss = np.mean(res[0])
+        loss_std = np.mean(res[1])
+        loss_max = np.max(res[2])
+        err = np.mean(res[3])
+        return loss, loss_std, loss_max, err
 
-    tr_loss = np.mean(tr_res[0])
-    tr_std = np.mean(tr_res[1])
-    tr_max = np.max(tr_res[2])
-    tr_err = np.mean(tr_res[3])
-
-    te_loss, te_std, te_max, te_err = test_fun()
+    shuffle(train_fun)
+    tr_loss, tr_std, tr_max, tr_err = process_set(train_fun)
+    te_loss, te_std, te_max, te_err = process_set(test_fun)
 
     print_str = [
         'epoch {0} retry {1}'.format(train_epoch, retry_num),
@@ -135,6 +138,7 @@ def init_set(train_set, test_set, nparams, r_index):
 
     fprint(['train set'])
     build_all(train_set)
+
     weights = list(nparams.w.values())
     bias = list(nparams.b.values())
     squared = [T.sqr(p).sum() for p in weights]
@@ -142,17 +146,24 @@ def init_set(train_set, test_set, nparams, r_index):
 
     batches = [train_set[i:i + BATCH_SIZE] for i in range(0, len(train_set), BATCH_SIZE)]
 
+    @timing
     def build_batch(batch):
         train_loss, train_loss_std, train_max_loss, train_err = get_errors(batch, True, l2)
-        updates = sgd(train_loss, weights + bias, 0.02)
+        updates = sgd(train_loss, weights + bias, learn_rate)
         return function([], [train_loss, train_loss_std, train_max_loss, train_err], updates=updates)
 
     train_fun = [build_batch(b) for b in batches]
 
+    @timing
+    def build_test_batch(batch):
+        test_loss, test_loss_std, test_max_loss, test_err = get_errors(batch, False, None)
+        return function([], [test_loss, test_loss_std, test_max_loss, test_err])
+
     fprint(['test set'])
     build_all(test_set)
-    test_loss, test_loss_std, test_max_loss, test_err = get_errors(test_set, False, None)
-    test_fun = function([], [test_loss, test_loss_std, test_max_loss, test_err])
+
+    test_batches = [test_set[i:i + BATCH_SIZE] for i in range(0, len(test_set), BATCH_SIZE)]
+    test_fun = [build_test_batch(b) for b in test_batches]
 
     return train_fun, test_fun
 
@@ -164,7 +175,7 @@ def train_step(retry_num, train_set, test_set, authors, nparams):
     reset_batches(test_set)
     r_index = build_vectors(authors)
     train_fun, test_fun = init_set(train_set, test_set, nparams, r_index)
-
+    gc.collect()
     plot_axes, plot = new_figure(retry_num, NUM_EPOCH, 1)  # len(authors) + 1)
 
     for train_epoch in range(NUM_EPOCH):
@@ -306,7 +317,7 @@ def main():
     authors, r_index = collapse_authors(all_authors)
     all_batches = generate_batches(dataset.methods_with_authors, r_index)
     batches, r_index, authors = group_batches(all_batches, r_index, authors)
-    train_set, test_set = divide_data_set(batches, 80, 40)
+    train_set, test_set = divide_data_set(batches, 100, 50)
     nparams = init_params(authors, 'AuthorClassifier/emb_params')
     for train_retry in range(NUM_RETRY):
         train_step(train_retry, train_set, test_set, authors, nparams)
