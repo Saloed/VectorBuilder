@@ -2,6 +2,7 @@ import _pickle as P
 import gc
 import math
 import sys
+from itertools import cycle
 from random import randint, shuffle
 
 import numpy as np
@@ -118,6 +119,18 @@ def reset_batches(batches):
     gc.collect()
 
 
+def get_errors(batches, need_l2, l2):
+    loss = [b.back.loss for b in batches]
+    error = [b.back.error for b in batches]
+    cost = T.mean(loss)
+    if need_l2: cost = cost + l2
+    err = T.mean(error)
+    max_loss = T.max(loss)
+    loss_std = T.std(T.as_tensor_variable(loss))
+
+    return cost, loss_std, max_loss, err
+
+
 def init_set(train_set, test_set, nparams, r_index):
     def build_all(batches):
         for i, batch in enumerate(batches):
@@ -125,36 +138,10 @@ def init_set(train_set, test_set, nparams, r_index):
             fprint(['build {}'.format(i)])
             batch.back = construct_from_nodes(batch.ast, nparams, BuildMode.train, author)  # type: NetLoss
 
-    def get_errors(batches, need_l2, l2):
-        loss = [b.back.loss for b in batches]
-        error = [b.back.error for b in batches]
-        cost = T.mean(loss)
-        if need_l2: cost = cost + l2
-        err = T.mean(error)
-        max_loss = T.max(loss)
-        loss_std = T.std(T.as_tensor_variable(loss))
-
-        return cost, loss_std, max_loss, err
-
     fprint(['train set'])
     build_all(train_set)
 
-    weights = list(nparams.w.values())
-    bias = list(nparams.b.values())
-    squared = [T.sqr(p).sum() for p in weights]
-    l2 = l2_param * T.sum(squared)
-
-    batches = [train_set[i:i + BATCH_SIZE] for i in range(0, len(train_set), BATCH_SIZE)]
-
-    @timing
-    def build_batch(batch):
-        train_loss, train_loss_std, train_max_loss, train_err = get_errors(batch, True, l2)
-        updates = sgd(train_loss, weights + bias, learn_rate)
-        return function([], [train_loss, train_loss_std, train_max_loss, train_err], updates=updates)
-
-    train_fun = [build_batch(b) for b in batches]
-
-    gc.collect()
+    train_batches = [train_set[i:i + BATCH_SIZE] for i in range(0, len(train_set), BATCH_SIZE)]
 
     @timing
     def build_test_batch(batch):
@@ -167,7 +154,21 @@ def init_set(train_set, test_set, nparams, r_index):
     test_batches = [test_set[i:i + BATCH_SIZE] for i in range(0, len(test_set), BATCH_SIZE)]
     test_fun = [build_test_batch(b) for b in test_batches]
 
-    return train_fun, test_fun
+    train_batches = cycle(train_batches)
+
+    return train_batches, test_fun
+
+
+@timing
+def build_train_fun(batch, nparams):
+    weights = list(nparams.w.values())
+    bias = list(nparams.b.values())
+    squared = [T.sqr(p).sum() for p in weights]
+    l2 = l2_param * T.sum(squared)
+
+    train_loss, train_loss_std, train_max_loss, train_err = get_errors(batch, True, l2)
+    updates = sgd(train_loss, weights + bias, learn_rate)
+    return [function([], [train_loss, train_loss_std, train_max_loss, train_err], updates=updates)]
 
 
 # @safe_run
@@ -176,11 +177,15 @@ def train_step(retry_num, train_set, test_set, authors, nparams):
     reset_batches(train_set)
     reset_batches(test_set)
     r_index = build_vectors(authors)
-    train_fun, test_fun = init_set(train_set, test_set, nparams, r_index)
-    gc.collect()
+    train_batches, test_fun = init_set(train_set, test_set, nparams, r_index)
+
     plot_axes, plot = new_figure(retry_num, NUM_EPOCH, 1)  # len(authors) + 1)
 
     for train_epoch in range(NUM_EPOCH):
+
+        if train_epoch % 10 == 0:
+            train_fun = build_train_fun(next(train_batches), nparams)
+
         error = epoch_step(train_epoch, retry_num, train_fun, test_fun, nparams)
         if error is None:
             break
@@ -319,7 +324,7 @@ def main():
     authors, r_index = collapse_authors(all_authors)
     all_batches = generate_batches(dataset.methods_with_authors, r_index)
     batches, r_index, authors = group_batches(all_batches, r_index, authors)
-    train_set, test_set = divide_data_set(batches, 100, 50)
+    train_set, test_set = divide_data_set(batches, 500, 50)
     nparams = init_params(authors, 'AuthorClassifier/emb_params')
     for train_retry in range(NUM_RETRY):
         train_step(train_retry, train_set, test_set, authors, nparams)
