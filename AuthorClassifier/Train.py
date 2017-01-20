@@ -115,8 +115,8 @@ def epoch_step(train_epoch, retry_num, train_fun, test_fun, nparams):
 def reset_batches(batches):
     for batch in batches:
         batch.back = None
-        batch.valid = None
-    gc.collect()
+        # batch.valid = None
+        # gc.collect()
 
 
 def get_errors(batches, need_l2, l2):
@@ -131,16 +131,13 @@ def get_errors(batches, need_l2, l2):
     return cost, loss_std, max_loss, err
 
 
+def build_all(batches, nparams, r_index):
+    for i, batch in enumerate(batches):
+        author = r_index[batch.author]
+        batch.back = construct_from_nodes(batch.ast, nparams, BuildMode.train, author)  # type: NetLoss
+
+
 def init_set(train_set, test_set, nparams, r_index):
-    def build_all(batches):
-        for i, batch in enumerate(batches):
-            author = r_index[batch.author]
-            fprint(['build {}'.format(i)])
-            batch.back = construct_from_nodes(batch.ast, nparams, BuildMode.train, author)  # type: NetLoss
-
-    fprint(['train set'])
-    build_all(train_set)
-
     train_batches = [train_set[i:i + BATCH_SIZE] for i in range(0, len(train_set), BATCH_SIZE)]
 
     @timing
@@ -149,10 +146,11 @@ def init_set(train_set, test_set, nparams, r_index):
         return function([], [test_loss, test_loss_std, test_max_loss, test_err])
 
     fprint(['test set'])
-    build_all(test_set)
+    build_all(test_set, nparams, r_index)
 
     test_batches = [test_set[i:i + BATCH_SIZE] for i in range(0, len(test_set), BATCH_SIZE)]
     test_fun = [build_test_batch(b) for b in test_batches]
+    reset_batches(test_set)
 
     train_batches = cycle(train_batches)
 
@@ -160,7 +158,9 @@ def init_set(train_set, test_set, nparams, r_index):
 
 
 @timing
-def build_train_fun(batch, nparams):
+def build_train_fun(batch, nparams, r_index):
+    build_all(batch, nparams, r_index)
+
     weights = list(nparams.w.values())
     bias = list(nparams.b.values())
     squared = [T.sqr(p).sum() for p in weights]
@@ -168,7 +168,9 @@ def build_train_fun(batch, nparams):
 
     train_loss, train_loss_std, train_max_loss, train_err = get_errors(batch, True, l2)
     updates = sgd(train_loss, weights + bias, learn_rate)
-    return [function([], [train_loss, train_loss_std, train_max_loss, train_err], updates=updates)]
+    train_fun = [function([], [train_loss, train_loss_std, train_max_loss, train_err], updates=updates)]
+    reset_batches(batch)
+    return train_fun
 
 
 # @safe_run
@@ -184,7 +186,9 @@ def train_step(retry_num, train_set, test_set, authors, nparams):
     for train_epoch in range(NUM_EPOCH):
 
         if train_epoch % 10 == 0:
-            train_fun = build_train_fun(next(train_batches), nparams)
+            train_fun = None
+            gc.collect()
+            train_fun = build_train_fun(next(train_batches), nparams, r_index)
 
         error = epoch_step(train_epoch, retry_num, train_fun, test_fun, nparams)
         if error is None:
