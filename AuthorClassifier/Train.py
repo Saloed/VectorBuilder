@@ -154,6 +154,8 @@ def init_set(train_set, test_set, nparams, r_index):
 
     train_fun = [build_batch(b) for b in batches]
 
+    gc.collect()
+
     @timing
     def build_test_batch(batch):
         test_loss, test_loss_std, test_max_loss, test_err = get_errors(batch, False, None)
