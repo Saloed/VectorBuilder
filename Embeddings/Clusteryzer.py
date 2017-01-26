@@ -1,6 +1,6 @@
 import _pickle as c_pickle
 
-from pyclustering.cluster.syncsom import syncsom
+# from pyclustering.cluster.syncsom import syncsom
 import numpy as np
 
 
@@ -71,4 +71,4 @@ def eps_nearest(data: dict, x):
 
 
 if __name__ == '__main__':
-    clustering('EmbTest/embeddings_w2v')
+    clustering('EmbTest/embeddings_w2v_new')

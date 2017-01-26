@@ -1,7 +1,7 @@
 from git import *
 from os import walk
 from collections import Counter, namedtuple
-
+import _pickle as P
 from AST.Tokenizer import parser_init, build_ast, print_ast, divide_by_methods, Nodes
 
 MAGIC_CONST = 0.68
@@ -39,6 +39,27 @@ def _associate_authors(file, authors: dict, parser):
     return [method for method in methods if method.root_node.author is not None]
 
 
+def count_authors(data: DataSet):
+    authors = {}
+    for d in data.methods_with_authors:
+        if d.root_node.author not in authors:
+            authors[d.root_node.author] = 0
+        authors[d.root_node.author] += 1
+    return authors
+
+
+def get_single_author_data(repo_path):
+    data = get_repo_methods_with_authors(repo_path)
+    authors = count_authors(data)
+    max_cnt = 0
+    author = None
+    for a, cnt in authors.items():
+        if cnt > max_cnt:
+            max_cnt = cnt
+            author = a
+    return DataSet([d for d in data.methods_with_authors if d.root_node.author == author], [author])
+
+
 def get_repo_methods_with_authors(repo_path) -> DataSet:
     parser = parser_init()
     repo = Repo(repo_path)
@@ -63,7 +84,7 @@ def get_repo_methods_with_authors(repo_path) -> DataSet:
 
 
 if __name__ == '__main__':
-    repo_path = '../Dataset/TestRepo/'
+    repo_path = '../Dataset/OneAuthorProjects/AndEngine/'
     good_methods = get_repo_methods_with_authors(repo_path)
-    for m in good_methods:
-        print(m.root_node.author)
+    with open('test_data', 'wb')as f:
+        P.dump(good_methods, f)

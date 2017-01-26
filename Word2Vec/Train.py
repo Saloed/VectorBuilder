@@ -18,7 +18,7 @@ def convert_to_parameters(emb, storage):
     embeddings = {cut_word(word): shared(emb[i], cut_word(word)) for word, i in storage._word2id.items()}
     # print(embeddings)
     param = Parameters(None, None, None, embeddings)
-    with open('embeddings_w2v', 'wb') as f:
+    with open('embeddings_w2v_new', 'wb') as f:
         P.dump(param, f)
 
 
@@ -40,7 +40,7 @@ def parse_model():
     saver = tf.train.Saver()
 
     with tf.Session() as sess:
-        saver.restore(sess, "SaveDir/end_model.ckpt-76835470")
+        saver.restore(sess, "SaveDir/end_model.ckpt-106545068")
         emb = w_in.eval(sess)  # type: np.multiarray.ndarray
         convert_to_parameters(emb, storage)
 
@@ -62,6 +62,7 @@ def main():
     word2vec.FLAGS.checkpoint_interval = 100
     word2vec.FLAGS.epochs_to_train = 500
     word2vec.FLAGS.embedding_size = NUM_FEATURES
+    # word2vec.FLAGS.concurrent_steps = 4
     word2vec.FLAGS.train_data = '../Dataset/psi_text.data'
     op = word2vec.Options()
 
@@ -82,4 +83,4 @@ def main():
 if __name__ == '__main__':
     # main()
     parse_model()
-    # make_train_file('../Dataset/java_files/')
+    # make_train_file('../Dataset/intellij-community')
