@@ -1,52 +1,56 @@
 import sys
 import _pickle as P
 
+import gc
+
+from theano import function
+
+from AST.GitAuthor import DataSet
+from AuthorClassifier.Builder import NetLoss
 from AuthorClassifier.Builder import construct_from_nodes
-from AuthorClassifier.Train import collapse_authors, generate_batches, build_vectors
 from AuthorClassifier.Builder import BuildMode
+import numpy as np
+
+from AuthorClassifier.Train import generate_batches, prepare_batches, build_vectors, divide_data_set
 
 
-def process_batches(batches, authors, params):
-    author_amount = len(authors)
-    reverse_index = build_vectors(authors)
-    correct = 0
-    invalid = 0
+def process_batches(batches, authors, nparams):
+    r_index = build_vectors(authors)
+    error = 0
+    size = len(batches)
     for i, batch in enumerate(batches):
-        author = reverse_index[batch.author]
-        print('build {}'.format(i))
-        net = construct_from_nodes(batch.ast, params, BuildMode.test, author_amount)
-        result = net()
-        print(batch.author, author, result)
-        if find_max(result, author_amount) == find_max(author, author_amount):
-            correct += 1
-        else:
-            invalid += 1
-
-
-def find_max(vector, size):
-    max_v = 0
-    max_i = 0
-    for i in range(size):
-        if vector[i] > max_v:
-            max_v = vector[i]
-            max_i = i
-    return max_i
+        author = r_index[batch.author]
+        net = construct_from_nodes(batch.ast, nparams, BuildMode.validation, author)  # type: NetLoss
+        fun = function([], net.error)
+        err = fun()[0]
+        print(err, error)
+        error += err
+    return error / size
 
 
 def main():
-    with open('../Dataset/author_file', 'rb') as f:
-        dataset = P.load(f)
+    sys.setrecursionlimit(99999)
+    np.set_printoptions(threshold=100000)
+    gc.enable()
 
-    with open('classifier_params', 'rb') as f:
+    with open('Dataset/author_file_AndEngine', 'rb') as f:
+        dataset_0 = P.load(f)  # type: DataSet
+    with open('Dataset/author_file_distributedlog', 'rb') as f:
+        dataset_1 = P.load(f)  # type: DataSet
+    with open('AuthorClassifier/best_result', 'rb') as f:
         params = P.load(f)
 
-    sys.setrecursionlimit(99999)
+    r_index = {dataset_0.all_authors[0]: 0, dataset_1.all_authors[0]: 1}
+    authors = [(0, [dataset_0.all_authors[0]]), (1, [dataset_1.all_authors[0]])]
 
-    all_authors = dataset.all_authors
-    authors = collapse_authors(all_authors)
-    all_batches = generate_batches(dataset.methods_with_authors)
+    batches = {0: generate_batches(dataset_0.methods_with_authors, r_index),
+               1: generate_batches(dataset_1.methods_with_authors, r_index)}
 
-    process_batches(all_batches, authors, params)
+    batches = prepare_batches(batches)
+    _, batches = divide_data_set(batches, 0, 900)
+
+    res = process_batches(batches, authors, params)
+    print('all data mean error {}'.format(res))
 
 
 if __name__ == '__main__':
