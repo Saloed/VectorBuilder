@@ -36,12 +36,12 @@ def compute_rates(root_node: Token):
 
 
 # @timing
-def construct_from_nodes(ast: Nodes, parameters: Params, mode: BuildMode, target):
+def construct_from_nodes(ast: Nodes, parameters: Params, mode: BuildMode, target, authors_amount):
     # visualize(ast.root_node, 'ast.png')
     nodes = ast.all_nodes
     compute_rates(ast.root_node)
     compute_leaf_num(ast.root_node, nodes)
-    return construct_network(ast, parameters, mode, target)
+    return construct_network(ast, parameters, mode, target, authors_amount)
 
 
 def compute_leaf_num(root, nodes, depth=0):
@@ -91,7 +91,7 @@ def convolve_creator(root_node, pooling_layer, conv_layers, layers, params):
         convolve_creator(child, pooling_layer, conv_layers, layers, params)
 
 
-def build_net(nodes: Nodes, params: Params):
+def build_net(nodes: Nodes, params: Params, authors_amount):
     used_embeddings = {}
     nodes_amount = len(nodes.all_nodes)
 
@@ -122,7 +122,7 @@ def build_net(nodes: Nodes, params: Params):
     pooling_layer = Pooling('pool', NUM_CONVOLUTION)
     convolve_creator(nodes.root_node, pooling_layer, conv_layers, _layers, params)
     hid_layer = FullConnected(params.b['b_hid'], T.nnet.sigmoid, name='hidden_layer', feature_amount=NUM_HIDDEN)
-    out_layer = FullConnected(params.b['b_out'], T.nnet.sigmoid, name='out_layer', feature_amount=1)
+    out_layer = FullConnected(params.b['b_out'], T.nnet.softmax, name='out_layer', feature_amount=authors_amount)
     Connection(pooling_layer, hid_layer, params.w['w_hid'])
     Connection(hid_layer, out_layer, params.w['w_out'])
     layers = _layers + conv_layers
@@ -132,23 +132,23 @@ def build_net(nodes: Nodes, params: Params):
     return layers, used_embeddings, pooling_layer
 
 
-def loss_function(target, net_frwd, params, need_l2: bool):
-    loss = -(target * T.log(net_frwd[0] + 1.e-10) + (1 - target) * T.log(1 - net_frwd[0] + 1.e-10))
-    if need_l2:
-        squared = [T.sqr(p).sum() for p in params]
-        loss = loss + l2_param * T.sum(squared)
-    return loss
+# def loss_function(target, net_frwd, params, need_l2: bool):
+#     loss = -(target * T.log(net_frwd[0] + 1.e-10) + (1 - target) * T.log(1 - net_frwd[0] + 1.e-10))
+#     if need_l2:
+#         squared = [T.sqr(p).sum() for p in params]
+#         loss = loss + l2_param * T.sum(squared)
+#     return loss
+#
+#
+# def get_updates(loss, params):
+#     updates = sgd(loss, params, learn_rate)
+#     for k, u in updates.items():
+#         updates[k] = T.clip(u, -clip_const, clip_const)
+#     return updates
 
 
-def get_updates(loss, params):
-    updates = sgd(loss, params, learn_rate)
-    for k, u in updates.items():
-        updates[k] = T.clip(u, -clip_const, clip_const)
-    return updates
-
-
-def construct_network(nodes: Nodes, parameters: Params, mode: BuildMode, target):
-    net, used_embeddings, dis_layer = build_net(nodes, parameters)
+def construct_network(nodes: Nodes, parameters: Params, mode: BuildMode, target, authors_amount):
+    net, used_embeddings, dis_layer = build_net(nodes, parameters, authors_amount)
 
     def f_builder(layer: Layer):
         if layer.forward is None:
@@ -159,11 +159,8 @@ def construct_network(nodes: Nodes, parameters: Params, mode: BuildMode, target)
             layer.build_forward()
 
     def back_propagation(net_forward):
-        error = T.neq(T.round(net_forward), target)
-        if target == 1:
-            loss = -T.log(net_forward[0] + 1.e-10)
-        else:
-            loss = -T.log(1 - net_forward[0] + 1.e-10)
+        error = T.neq(T.argmax(net_forward), target[1])
+        loss = -T.sum(target[0] * T.log(net_forward + 1.e-10))
         return NetLoss(net_forward, loss, error)
 
     f_builder(net[-1])

@@ -16,7 +16,7 @@ from AST.GitAuthor import DataSet
 from AST.GitAuthor import get_repo_methods_with_authors, get_single_author_data
 from AuthorClassifier.Builder import NetLoss
 from AuthorClassifier.Builder import construct_from_nodes, BuildMode
-from AuthorClassifier.ClassifierParams import NUM_RETRY, NUM_EPOCH, l2_param, BATCH_SIZE, learn_rate
+from AuthorClassifier.ClassifierParams import NUM_RETRY, NUM_EPOCH, l2_param, BATCH_SIZE, learn_rate, SAVE_PERIOD
 from AuthorClassifier.InitParams import init_params
 from Utils.Visualization import new_figure
 from Utils.Visualization import save_to_file
@@ -70,8 +70,10 @@ def build_vectors(authors):
     # assuming that we have only two authors
     for uauthor in authors:
         for author in uauthor[1]:
-            index[author] = uauthor[0]
-    return index
+            vec = [0] * size
+            vec[uauthor[0]] = 1
+            index[author] = (vec, uauthor[0])
+    return size, index
 
 
 @safe_run
@@ -107,7 +109,7 @@ def epoch_step(train_epoch, retry_num, train_fun, test_fun, nparams):
     if math.isnan(tr_loss) or math.isnan(te_loss):
         raise Exception('Error is NAN. Start new retry')
 
-    if train_epoch % 100 == 0:
+    if train_epoch % SAVE_PERIOD == 0:
         with open('AuthorClassifier/NewParams/new_params_t' + str(retry_num) + "_ep" + str(train_epoch),
                   mode='wb') as new_params:
             P.dump(nparams, new_params)
@@ -134,13 +136,13 @@ def get_errors(batches, need_l2, l2):
     return cost, loss_std, max_loss, err
 
 
-def build_all(batches, nparams, r_index):
+def build_all(batches, nparams, r_index, authors_amount):
     for i, batch in enumerate(batches):
         author = r_index[batch.author]
-        batch.back = construct_from_nodes(batch.ast, nparams, BuildMode.train, author)  # type: NetLoss
+        batch.back = construct_from_nodes(batch.ast, nparams, BuildMode.train, author, authors_amount)  # type: NetLoss
 
 
-def init_set(train_set, test_set, nparams, r_index):
+def init_set(train_set, test_set, nparams, r_index, authors_amount):
     train_batches = [train_set[i:i + BATCH_SIZE] for i in range(0, len(train_set), BATCH_SIZE)]
 
     @timing
@@ -149,7 +151,7 @@ def init_set(train_set, test_set, nparams, r_index):
         return function([], [test_loss, test_loss_std, test_max_loss, test_err])
 
     fprint(['test set'])
-    build_all(test_set, nparams, r_index)
+    build_all(test_set, nparams, r_index, authors_amount)
 
     test_batches = [test_set[i:i + BATCH_SIZE] for i in range(0, len(test_set), BATCH_SIZE)]
     test_fun = [build_test_batch(b) for b in test_batches]
@@ -161,8 +163,8 @@ def init_set(train_set, test_set, nparams, r_index):
 
 
 @timing
-def build_train_fun(batch, nparams, r_index):
-    build_all(batch, nparams, r_index)
+def build_train_fun(batch, nparams, r_index, authors_amount):
+    build_all(batch, nparams, r_index, authors_amount)
 
     weights = list(nparams.w.values())
     bias = list(nparams.b.values())
@@ -177,15 +179,15 @@ def build_train_fun(batch, nparams, r_index):
 
 
 # @safe_run
-def train_step(retry_num, train_set, test_set, authors, nparams):
-    nparams = init_params(authors, 'AuthorClassifier/emb_params')
+def train_step(retry_num, train_set, test_set, authors):
     reset_batches(train_set)
     reset_batches(test_set)
-    r_index = build_vectors(authors)
-    train_batches, test_fun = init_set(train_set, test_set, nparams, r_index)
+    authors_amount, r_index = build_vectors(authors)
+    nparams = init_params(authors_amount, 'AuthorClassifier/emb_params')
+    train_batches, test_fun = init_set(train_set, test_set, nparams, r_index, authors_amount)
     train_fun = []
     for train_batch in train_batches:
-        fun = build_train_fun(train_batch, nparams, r_index)
+        fun = build_train_fun(train_batch, nparams, r_index, authors_amount)
         train_fun.append(fun)
         gc.collect()
 
@@ -245,11 +247,10 @@ def spec_main():
     batches = {i: generate_batches(dataset[i][0], r_index) for i in indexes}
     batches = prepare_batches(batches)
     train_set, test_set = divide_data_set(batches, 100, 50)
-    nparams = init_params(authors, 'AuthorClassifier/emb_params')
     dataset, batches = (None, None)
     gc.collect()
     for train_retry in range(NUM_RETRY):
-        train_step(train_retry, train_set, test_set, authors, nparams)
+        train_step(train_retry, train_set, test_set, authors)
 
 
 def main():
@@ -269,11 +270,10 @@ def main():
                1: generate_batches(dataset[1].methods_with_authors, r_index)}
 
     batches = prepare_batches(batches)
-    train_set, test_set = divide_data_set(batches, 100, 50)
+    train_set, test_set = divide_data_set(batches, 2, 2)
 
-    nparams = init_params(authors, 'AuthorClassifier/emb_params')
     for train_retry in range(NUM_RETRY):
-        train_step(train_retry, train_set, test_set, authors, nparams)
+        train_step(train_retry, train_set, test_set, authors)
 
 
 if __name__ == '__main__':

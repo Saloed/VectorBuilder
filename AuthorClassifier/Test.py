@@ -15,7 +15,7 @@ from AuthorClassifier.Train import generate_batches, prepare_batches, build_vect
 
 
 def process_batches(batches, authors, nparams):
-    r_index = build_vectors(authors)
+    author_amount, r_index = build_vectors(authors)
     error = 0
     size = len(batches)
     for i, batch in enumerate(batches):
