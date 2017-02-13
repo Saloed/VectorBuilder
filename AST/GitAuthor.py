@@ -65,8 +65,9 @@ def get_repo_methods_with_authors(repo_path) -> DataSet:
     repo = Repo(repo_path)
     files = parse_directory(repo_path, [])
     methods_with_authors = []
-    for file in files:
+    for i, file in enumerate(files):
         file_in_repo = file.replace(repo_path, "")
+        print(file_in_repo + ' {}/{}'.format(i, len(files)))
         blames = repo.blame_incremental('HEAD', file_in_repo)
         authors = {}
         for blame in blames:

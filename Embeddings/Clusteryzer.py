@@ -10,7 +10,7 @@ def clustering(file_with_params):
 
     embs = {k: e.eval() for k, e in params.embeddings.items()}
 
-    nearest = eps_nearest(embs, 0.4)
+    nearest = eps_nearest(embs, 0.2)
     for n in nearest:
         print(n)
 
@@ -41,8 +41,8 @@ def clustering(file_with_params):
 #     return None
 
 
-def euclid_dist(x, y):
-    return np.std(x - y)
+def dist(x, y):
+    return np.mean((x - y) ** 2)
 
 
 class Neighbours:
@@ -60,7 +60,7 @@ class Neighbours:
 
 def eps_nearest(data: dict, x):
     def find_nearest(target, data, x):
-        res = [(label, euclid_dist(target, value)) for label, value in data.items()]
+        res = [(label, dist(target, value)) for label, value in data.items()]
         res = [r for r in res if r[1] < x]
         res.sort(key=lambda t: t[1])
         return res[1:]

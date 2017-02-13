@@ -1,6 +1,6 @@
 from copy import deepcopy
-
-from lasagne.updates import adadelta
+import numpy as np
+from lasagne.updates import adadelta, sgd
 from theano import function
 
 from AuthorClassifier.Builder import compute_leaf_num
@@ -95,20 +95,20 @@ def construct(tokens, params: Parameters, root_token_index, just_validation=Fals
         pos_delta = pos_forward - pos_target
         neg_delta = neg_forward - neg_target
 
-        pos_d = T.std(pos_delta) * 0.5
-        neg_d = T.std(neg_delta) * 0.5
+        pos_d = T.mean(pos_delta ** 2) * 0.5
+        neg_d = T.mean(neg_delta ** 2) * 0.5
 
         update_params = list(params.w.values()) + list(used_embeddings.values())
 
         # p_len = T.std(pos_forward)
         # n_len = T.std(neg_forward)
-        squared = [T.sqr(p).sum() for p in update_params]
+        # squared = [T.sqr(p).sum() for p in update_params]
 
-        error = T.nnet.relu(MARGIN + pos_d - neg_d) + l2_param * T.sum(squared)
+        error = T.nnet.relu(MARGIN + pos_d - neg_d)  # + l2_param * T.sum(squared)
 
         if not just_validation:
 
-            updates = adadelta(error, update_params)
+            updates = sgd(error, update_params, 0.01)
 
             return function([secret_param, alpha, decay], outputs=error, updates=updates, on_unused_input='ignore')
         else:

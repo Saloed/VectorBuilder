@@ -30,9 +30,9 @@ theano.config.mode = 'FAST_COMPILE'
 # theano.config.exception_verbosity = 'high'
 
 def generate_author_file():
-    # data_set = get_repo_methods_with_authors('Dataset/TestRepo/')
-    data_set = get_single_author_data('../Dataset/OneAuthorProjects/distributedlog/')
-    with open('../Dataset/author_file_distributedlog', 'wb') as f:
+    data_set = get_repo_methods_with_authors('../Dataset/CombinedProjects/MPS/')
+    # data_set = get_single_author_data('../Dataset/OneAuthorProjects/distributedlog/')
+    with open('../Dataset/CombinedProjects/author_file_MPS', 'wb') as f:
         P.dump(data_set, f)
 
 
@@ -230,21 +230,43 @@ def divide_data_set(data_set, train_units, test_units):
     return train_set, test_set
 
 
+def spec_main():
+    sys.setrecursionlimit(99999)
+    np.set_printoptions(threshold=100000)
+    gc.enable()
+    # with open('Dataset/CombinedProjects/top_5_MPS', 'rb') as f:
+    with open('Dataset/author_file_kylin', 'rb') as f:
+        dataset = P.load(f)
+    # dataset = dataset[:2]
+    indexes = range(len(dataset))
+    r_index = {aa: i for i, a in enumerate(dataset) for aa in a[1]}
+    authors = [(i, dataset[i][1]) for i in indexes]
+    gc.collect()
+    batches = {i: generate_batches(dataset[i][0], r_index) for i in indexes}
+    batches = prepare_batches(batches)
+    train_set, test_set = divide_data_set(batches, 100, 50)
+    nparams = init_params(authors, 'AuthorClassifier/emb_params')
+    dataset, batches = (None, None)
+    gc.collect()
+    for train_retry in range(NUM_RETRY):
+        train_step(train_retry, train_set, test_set, authors, nparams)
+
+
 def main():
     sys.setrecursionlimit(99999)
     np.set_printoptions(threshold=100000)
     gc.enable()
+    dataset: list[DataSet] = [None, None]
+    with open('Dataset/CombinedProjects/author_file_compass', 'rb') as f:
+        dataset[0] = P.load(f)  # type: DataSet
+    with open('Dataset/CombinedProjects/author_file_textmapper', 'rb') as f:
+        dataset[1] = P.load(f)  # type: DataSet
 
-    with open('Dataset/author_file_AndEngine', 'rb') as f:
-        dataset_0 = P.load(f)  # type: DataSet
-    with open('Dataset/author_file_distributedlog', 'rb') as f:
-        dataset_1 = P.load(f)  # type: DataSet
+    r_index = {a: i for i in [0, 1] for a in dataset[i].all_authors}
+    authors = [(0, dataset[0].all_authors), (1, dataset[1].all_authors)]
 
-    r_index = {dataset_0.all_authors[0]: 0, dataset_1.all_authors[0]: 1}
-    authors = [(0, [dataset_0.all_authors[0]]), (1, [dataset_1.all_authors[0]])]
-
-    batches = {0: generate_batches(dataset_0.methods_with_authors, r_index),
-               1: generate_batches(dataset_1.methods_with_authors, r_index)}
+    batches = {0: generate_batches(dataset[0].methods_with_authors, r_index),
+               1: generate_batches(dataset[1].methods_with_authors, r_index)}
 
     batches = prepare_batches(batches)
     train_set, test_set = divide_data_set(batches, 100, 50)
@@ -255,6 +277,7 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    # main()
+    spec_main()
     # generate_author_file()
     # test()

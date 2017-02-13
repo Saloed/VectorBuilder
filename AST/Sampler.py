@@ -37,7 +37,7 @@ def build_psi_text(dataset_dir):
     delimiter = 'WHITE_SPACE ' * 5 + '\n'
     text = delimiter.join(psi_text_file)
 
-    with open('/home/sobol/PycharmProjects/VectorBuilder/Dataset/psi_text.data', 'w') as text_file:
+    with open('/home/sobol/PycharmProjects/VectorBuilder/Dataset/psi_text_1.data', 'w') as text_file:
         text_file.write(text)
 
 
