@@ -145,6 +145,7 @@ def build_all(batches, nparams, r_index, authors_amount):
 def init_set(train_set, test_set, nparams, r_index, authors_amount):
     train_batches = [train_set[i:i + BATCH_SIZE] for i in range(0, len(train_set), BATCH_SIZE)]
 
+
     @timing
     def build_test_batch(batch):
         test_loss, test_loss_std, test_max_loss, test_err = get_errors(batch, False, None)
@@ -236,17 +237,17 @@ def spec_main():
     sys.setrecursionlimit(99999)
     np.set_printoptions(threshold=100000)
     gc.enable()
-    # with open('Dataset/CombinedProjects/top_5_MPS', 'rb') as f:
-    with open('Dataset/author_file_kylin', 'rb') as f:
+    with open('Dataset/CombinedProjects/top_authors_MPS', 'rb') as f:
+        # with open('Dataset/author_file_kylin', 'rb') as f:
         dataset = P.load(f)
-    # dataset = dataset[:2]
+    dataset = dataset[:5]
     indexes = range(len(dataset))
     r_index = {aa: i for i, a in enumerate(dataset) for aa in a[1]}
     authors = [(i, dataset[i][1]) for i in indexes]
     gc.collect()
     batches = {i: generate_batches(dataset[i][0], r_index) for i in indexes}
     batches = prepare_batches(batches)
-    train_set, test_set = divide_data_set(batches, 100, 50)
+    train_set, test_set = divide_data_set(batches, 40, 20)
     dataset, batches = (None, None)
     gc.collect()
     for train_retry in range(NUM_RETRY):
