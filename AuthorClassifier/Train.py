@@ -121,7 +121,6 @@ def reset_batches(batches):
     for batch in batches:
         batch.back = None
         # batch.valid = None
-        # gc.collect()
 
 
 def get_errors(batches, need_l2, l2):
@@ -145,7 +144,6 @@ def build_all(batches, nparams, r_index, authors_amount):
 def init_set(train_set, test_set, nparams, r_index, authors_amount):
     train_batches = [train_set[i:i + BATCH_SIZE] for i in range(0, len(train_set), BATCH_SIZE)]
 
-
     @timing
     def build_test_batch(batch):
         test_loss, test_loss_std, test_max_loss, test_err = get_errors(batch, False, None)
@@ -155,11 +153,14 @@ def init_set(train_set, test_set, nparams, r_index, authors_amount):
     build_all(test_set, nparams, r_index, authors_amount)
 
     test_batches = [test_set[i:i + BATCH_SIZE] for i in range(0, len(test_set), BATCH_SIZE)]
-    test_fun = [build_test_batch(b) for b in test_batches]
+    # test_fun = [build_test_batch(b) for b in test_batches]
+
+    test_fun = []
+    for i, b in enumerate(test_batches):
+        print('{}/{}'.format(i, len(test_batches)))
+        test_fun.append(build_test_batch(b))
+
     reset_batches(test_set)
-
-    # train_batches = cycle(train_batches)
-
     return train_batches, test_fun
 
 
@@ -183,14 +184,15 @@ def build_train_fun(batch, nparams, r_index, authors_amount):
 def train_step(retry_num, train_set, test_set, authors):
     reset_batches(train_set)
     reset_batches(test_set)
+    gc.collect()
     authors_amount, r_index = build_vectors(authors)
     nparams = init_params(authors_amount, 'AuthorClassifier/emb_params')
     train_batches, test_fun = init_set(train_set, test_set, nparams, r_index, authors_amount)
     train_fun = []
-    for train_batch in train_batches:
+    for i, train_batch in enumerate(train_batches):
+        print('{}/{}'.format(i, len(train_batches)))
         fun = build_train_fun(train_batch, nparams, r_index, authors_amount)
         train_fun.append(fun)
-        gc.collect()
 
     plot_axes, plot = new_figure(retry_num, NUM_EPOCH, 1)  # len(authors) + 1)
 
@@ -244,37 +246,36 @@ def spec_main():
     indexes = range(len(dataset))
     r_index = {aa: i for i, a in enumerate(dataset) for aa in a[1]}
     authors = [(i, dataset[i][1]) for i in indexes]
-    gc.collect()
     batches = {i: generate_batches(dataset[i][0], r_index) for i in indexes}
     batches = prepare_batches(batches)
-    train_set, test_set = divide_data_set(batches, 40, 20)
+    train_set, test_set = divide_data_set(batches, 200, 100)
     dataset, batches = (None, None)
-    gc.collect()
     for train_retry in range(NUM_RETRY):
         train_step(train_retry, train_set, test_set, authors)
 
 
-def main():
-    sys.setrecursionlimit(99999)
-    np.set_printoptions(threshold=100000)
-    gc.enable()
-    dataset: list[DataSet] = [None, None]
-    with open('Dataset/CombinedProjects/author_file_compass', 'rb') as f:
-        dataset[0] = P.load(f)  # type: DataSet
-    with open('Dataset/CombinedProjects/author_file_textmapper', 'rb') as f:
-        dataset[1] = P.load(f)  # type: DataSet
-
-    r_index = {a: i for i in [0, 1] for a in dataset[i].all_authors}
-    authors = [(0, dataset[0].all_authors), (1, dataset[1].all_authors)]
-
-    batches = {0: generate_batches(dataset[0].methods_with_authors, r_index),
-               1: generate_batches(dataset[1].methods_with_authors, r_index)}
-
-    batches = prepare_batches(batches)
-    train_set, test_set = divide_data_set(batches, 2, 2)
-
-    for train_retry in range(NUM_RETRY):
-        train_step(train_retry, train_set, test_set, authors)
+#
+# def main():
+#     sys.setrecursionlimit(99999)
+#     np.set_printoptions(threshold=100000)
+#     gc.enable()
+#     dataset: list[DataSet] = [None, None]
+#     with open('Dataset/CombinedProjects/author_file_compass', 'rb') as f:
+#         dataset[0] = P.load(f)  # type: DataSet
+#     with open('Dataset/CombinedProjects/author_file_textmapper', 'rb') as f:
+#         dataset[1] = P.load(f)  # type: DataSet
+#
+#     r_index = {a: i for i in [0, 1] for a in dataset[i].all_authors}
+#     authors = [(0, dataset[0].all_authors), (1, dataset[1].all_authors)]
+#
+#     batches = {0: generate_batches(dataset[0].methods_with_authors, r_index),
+#                1: generate_batches(dataset[1].methods_with_authors, r_index)}
+#
+#     batches = prepare_batches(batches)
+#     train_set, test_set = divide_data_set(batches, 2, 2)
+#
+#     for train_retry in range(NUM_RETRY):
+#         train_step(train_retry, train_set, test_set, authors)
 
 
 if __name__ == '__main__':
