@@ -238,7 +238,7 @@ def divide_data_set(data_set, train_units, test_units):
 def spec_main():
     sys.setrecursionlimit(99999)
     np.set_printoptions(threshold=100000)
-    gc.enable()
+    gc.disable()
     with open('Dataset/CombinedProjects/top_authors_MPS', 'rb') as f:
         # with open('Dataset/author_file_kylin', 'rb') as f:
         dataset = P.load(f)
@@ -248,7 +248,7 @@ def spec_main():
     authors = [(i, dataset[i][1]) for i in indexes]
     batches = {i: generate_batches(dataset[i][0], r_index) for i in indexes}
     batches = prepare_batches(batches)
-    train_set, test_set = divide_data_set(batches, 200, 100)
+    train_set, test_set = divide_data_set(batches, 240, 100)
     dataset, batches = (None, None)
     for train_retry in range(NUM_RETRY):
         train_step(train_retry, train_set, test_set, authors)
