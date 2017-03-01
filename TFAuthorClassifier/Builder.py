@@ -115,29 +115,28 @@ def build_net(nodes: Nodes, params: Params, authors_amount):
     return layers, used_embeddings, pooling_layer
 
 
+def f_builder(layer: Layer):
+    if layer.forward is None:
+        for c in layer.in_connection:
+            if c.forward is None:
+                f_builder(c.from_layer)
+                c.build_forward()
+        layer.build_forward()
+
+
 def construct_network(nodes: Nodes, parameters: Params, mode: BuildMode, target, authors_amount):
     net, used_embeddings, dis_layer = build_net(nodes, parameters, authors_amount)
 
-    def f_builder(layer: Layer):
-        if layer.forward is None:
-            for c in layer.in_connection:
-                if c.forward is None:
-                    f_builder(c.from_layer)
-                    c.build_forward()
-            layer.build_forward()
-
     def back_propagation(net_forward):
-        error = tf.not_equal(tf.argmax(net_forward), target[1])
+        res = tf.argmax(net_forward, 0)
+        error = tf.cast(tf.not_equal(res, target[1]), tf.int8)
         loss = -tf.reduce_sum(target[0] * tf.log(net_forward + 1.e-10))
         return NetLoss(net_forward, loss, error)
 
     f_builder(net[-1])
 
     net_forward = net[-1].forward
-    # pydotprint(net_forward,'net_fwd.jpg',format='jpg')
-    # raise Exception('dont need more')
-
     if mode == BuildMode.train or mode == BuildMode.validation:
         return back_propagation(net_forward)
     else:
-        return function([], net_forward)
+        return net_forward

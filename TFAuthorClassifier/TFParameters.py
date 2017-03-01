@@ -33,14 +33,15 @@ def rand_weight(shape_0, shape_1, name):
 
 def rand_bias(shape, name):
     return tf.Variable(
-        tf.truncated_normal(shape=[shape], stddev=RANDOM_RANGE),
+        tf.truncated_normal(shape=[shape, 1], stddev=RANDOM_RANGE),
         name=name)
 
 
 def init_params(author_amount):
     with open('TFAuthorClassifier/embeddings', 'rb') as f:
         np_embs = P.load(f)
-    embeddings = {name: tf.constant(val, dtype=tf.float32, name=name) for name, val in np_embs.items()}
+    embeddings = {name: tf.expand_dims(tf.constant(val, dtype=tf.float32, name=name), 1) for name, val in
+                  np_embs.items()}
 
     w_conv_root = rand_weight(NUM_CONVOLUTION, NUM_FEATURES, 'w_conv_root')
     w_conv_left = rand_weight(NUM_CONVOLUTION, NUM_FEATURES, 'w_conv_left')
