@@ -116,21 +116,23 @@ def build_net(nodes: Nodes, params: Params, authors_amount):
 
 
 def f_builder(layer: Layer):
-    if layer.forward is None:
-        for c in layer.in_connection:
-            if c.forward is None:
-                f_builder(c.from_layer)
-                c.build_forward()
-        layer.build_forward()
+    with tf.name_scope(layer.name):
+        if layer.forward is None:
+            for c in layer.in_connection:
+                if c.forward is None:
+                    f_builder(c.from_layer)
+                    c.build_forward()
+            layer.build_forward()
 
 
 def construct_network(nodes: Nodes, parameters: Params, mode: BuildMode, target, authors_amount):
     net, used_embeddings, dis_layer = build_net(nodes, parameters, authors_amount)
 
     def back_propagation(net_forward):
-        res = tf.argmax(net_forward, 0)
-        error = tf.cast(tf.not_equal(res, target[1]), tf.int8)
-        loss = -tf.reduce_sum(target[0] * tf.log(net_forward + 1.e-10))
+        with tf.name_scope('NetLoss'):
+            res = tf.argmax(net_forward, 0)
+            error = tf.cast(tf.not_equal(res, target[1]), tf.int8)
+            loss = -tf.reduce_sum(target[0] * tf.log(net_forward + 1.e-10))
         return NetLoss(net_forward, loss, error)
 
     f_builder(net[-1])

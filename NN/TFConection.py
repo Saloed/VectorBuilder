@@ -10,7 +10,7 @@ class BaseConnection:
         self.to_layer = to_layer
         self.forward = None
 
-        from_layer.add_out_coonection(self)
+        from_layer.add_out_connection(self)
         to_layer.add_in_connection(self)
 
     @abstractmethod

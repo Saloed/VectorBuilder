@@ -7,7 +7,8 @@ from random import randint, shuffle
 import numpy as np
 import tensorflow as tf
 
-from AuthorClassifier.ClassifierParams import NUM_RETRY, NUM_EPOCH, l2_param, BATCH_SIZE, learn_rate, SAVE_PERIOD
+from AuthorClassifier.ClassifierParams import NUM_RETRY, NUM_EPOCH, l2_param, BATCH_SIZE, learn_rate, SAVE_PERIOD, \
+    TOKEN_THRESHOLD
 from TFAuthorClassifier.Builder import NetLoss
 from TFAuthorClassifier.Builder import construct_from_nodes, BuildMode
 from TFAuthorClassifier.TFParameters import init_params
@@ -105,12 +106,12 @@ def reset_batches(batches):
 def get_errors(batches, need_l2, l2):
     loss = [b.back.loss for b in batches]
     error = [b.back.error for b in batches]
-    cost = tf.reduce_mean(loss)
-    err = tf.reduce_mean(error)
-    max_loss = tf.reduce_max(loss)
-
-    loss_std = tf.sqrt(tf.reduce_mean(tf.square(tf.subtract(loss, tf.reduce_mean(loss)))))
-    if need_l2: cost = cost + l2
+    with tf.name_scope('BatchErrors'):
+        cost = tf.reduce_mean(loss)
+        err = tf.reduce_mean(error)
+        max_loss = tf.reduce_max(loss)
+        loss_std = tf.sqrt(tf.reduce_mean(tf.square(tf.subtract(loss, tf.reduce_mean(loss)))))
+        if need_l2: cost = cost + l2
     return cost, loss_std, max_loss, err
 
 
@@ -149,8 +150,9 @@ def build_train_fun(batch, nparams, r_index, authors_amount):
 
     weights = list(nparams.w.values())
     bias = list(nparams.b.values())
-    reg_weights = [tf.nn.l2_loss(p) for p in weights]
-    l2 = l2_param * tf.reduce_sum(reg_weights)
+    with tf.name_scope('L2_Loss'):
+        reg_weights = [tf.nn.l2_loss(p) for p in weights]
+        l2 = l2_param * tf.reduce_sum(reg_weights)
 
     train_loss, train_loss_std, train_max_loss, train_err = get_errors(batch, True, l2)
     updates = tf.train.GradientDescentOptimizer(learn_rate).minimize(train_loss)
@@ -176,20 +178,21 @@ def train_step(retry_num, train_set, test_set, authors):
     plot_axes, plot = new_figure(retry_num, NUM_EPOCH, 1)  # len(authors) + 1)
     saver = tf.train.Saver()
     with tf.Session() as sess, tf.device("/cpu:0"):
+        # sess.run(tf.global_variables_initializer())
 
-        # graph_writer = tf.summary.FileWriter('TFAuthorClassifier/Graph', sess.graph)
-        # run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
-        # run_metadata = tf.RunMetadata()
-        # sess.run(tf.global_variables_initializer(),options=run_options,run_metadata=run_metadata)
-        # graph_writer.add_run_metadata(run_metadata,'init')
-        # run_metadata = tf.RunMetadata()
-        # sess.run(fetches=train_fun[0],options=run_options,run_metadata=run_metadata)
-        # graph_writer.add_run_metadata(run_metadata, 'train')
-        # run_metadata = tf.RunMetadata()
-        # sess.run(fetches=test_fun[0], options=run_options, run_metadata=run_metadata)
-        # graph_writer.add_run_metadata(run_metadata, 'test')
-        # graph_writer.close()
-        # raise Exception('stop')
+        graph_writer = tf.summary.FileWriter('TFAuthorClassifier/Graph', sess.graph)
+        run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
+        run_metadata = tf.RunMetadata()
+        sess.run(tf.global_variables_initializer(), options=run_options, run_metadata=run_metadata)
+        graph_writer.add_run_metadata(run_metadata, 'init')
+        run_metadata = tf.RunMetadata()
+        sess.run(feed_dict=nparams.emb_values, fetches=train_fun[0], options=run_options, run_metadata=run_metadata)
+        graph_writer.add_run_metadata(run_metadata, 'train')
+        run_metadata = tf.RunMetadata()
+        sess.run(feed_dict=nparams.emb_values, fetches=test_fun[0], options=run_options, run_metadata=run_metadata)
+        graph_writer.add_run_metadata(run_metadata, 'test')
+        graph_writer.close()
+        exit(99)
 
         for train_epoch in range(NUM_EPOCH):
             error = epoch_step(train_epoch, retry_num, train_fun, test_fun, sess)
@@ -206,7 +209,7 @@ def train_step(retry_num, train_set, test_set, authors):
 def prepare_batches(batches):
     new_batches = {}
     for k, v in batches.items():
-        samples = [s for s in v if len(s.ast.all_nodes) > 0]
+        samples = [s for s in v if len(s.ast.all_nodes) > TOKEN_THRESHOLD]
         shuffle(samples)
         new_batches[k] = samples
     return new_batches
@@ -237,16 +240,16 @@ def spec_main():
     np.set_printoptions(threshold=100000)
     gc.enable()
     # with open('Dataset/author_file_kylin', 'rb') as f:
-    with open('Dataset/CombinedProjects/top_authors_MPS', 'rb') as f:
-        # with open('TFAuthorClassifier/test_data','rb') as f:
+    # with open('Dataset/CombinedProjects/top_authors_MPS', 'rb') as f:
+    with open('TFAuthorClassifier/test_data', 'rb') as f:
         dataset = P.load(f)
-    dataset = dataset[:5]
+    # dataset = dataset[:5]
     indexes = range(len(dataset))
     r_index = {aa: i for i, a in enumerate(dataset) for aa in a[1]}
     authors = [(i, dataset[i][1]) for i in indexes]
     batches = {i: generate_batches(dataset[i][0], r_index) for i in indexes}
     batches = prepare_batches(batches)
-    train_set, test_set = divide_data_set(batches, 40, 20)
+    train_set, test_set = divide_data_set(batches, 1, 1)
     dataset, batches = (None, None)
     for train_retry in range(NUM_RETRY):
         train_step(train_retry, train_set, test_set, authors)

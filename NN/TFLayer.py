@@ -19,8 +19,11 @@ class Layer:
     def add_in_connection(self, con):
         self.in_connection.append(con)
 
-    def add_out_coonection(self, con):
+    def add_out_connection(self, con):
         self.out_connection.append(con)
+
+    def _get_forward(self):
+        return [c.forward for c in self.in_connection]
 
     def __str__(self):
         return self.name
@@ -49,8 +52,7 @@ class Combination(Layer):
         super().__init__(name, feature_amount)
 
     def build_forward(self):
-        connections = [c.forward for c in self.in_connection]
-        self.forward = tf.reduce_sum(connections, axis=0)
+        self.forward = tf.reduce_sum(self._get_forward(), axis=0)
 
 
 class Encoder(Layer):
@@ -61,8 +63,7 @@ class Encoder(Layer):
         self.activation = activation
 
     def build_forward(self):
-        connections = [c.forward for c in self.in_connection]
-        z = tf.reduce_sum(connections, axis=0)
+        z = tf.reduce_sum(self._get_forward(), axis=0)
         self.forward = self.activation(tf.add(z, self.bias))
 
 
@@ -75,8 +76,7 @@ class Convolution(Layer):
         self.activation = activation
 
     def build_forward(self):
-        connections = [c.forward for c in self.in_connection]
-        z = tf.reduce_sum(connections, axis=0)
+        z = tf.reduce_sum(self._get_forward(), axis=0)
         self.forward = self.activation(tf.add(z, self.bias))
 
 
@@ -88,8 +88,8 @@ class FullConnected(Layer):
         self.activation = activation
 
     def build_forward(self):
-        connections = [c.forward for c in self.in_connection]
-        z = tf.reduce_sum(connections, axis=0)
+        # z = tf.reduce_sum(self._get_forward(), axis=0, name=self.name + '_sum')
+        z = self._get_forward()[0]
         self.forward = self.activation(tf.add(z, self.bias))
 
 
@@ -98,5 +98,4 @@ class Pooling(Layer):
         super().__init__(name, feature_amount)
 
     def build_forward(self):
-        connections = [c.forward for c in self.in_connection]
-        self.forward = tf.reduce_max(connections, axis=0)
+        self.forward = tf.reduce_max(self._get_forward(), axis=0)

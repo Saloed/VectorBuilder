@@ -16,7 +16,8 @@ from AST.GitAuthor import DataSet
 from AST.GitAuthor import get_repo_methods_with_authors, get_single_author_data
 from AuthorClassifier.Builder import NetLoss
 from AuthorClassifier.Builder import construct_from_nodes, BuildMode
-from AuthorClassifier.ClassifierParams import NUM_RETRY, NUM_EPOCH, l2_param, BATCH_SIZE, learn_rate, SAVE_PERIOD
+from AuthorClassifier.ClassifierParams import NUM_RETRY, NUM_EPOCH, l2_param, BATCH_SIZE, learn_rate, SAVE_PERIOD, \
+    TOKEN_THRESHOLD
 from AuthorClassifier.InitParams import init_params
 from Utils.Visualization import new_figure
 from Utils.Visualization import save_to_file
@@ -209,7 +210,7 @@ def train_step(retry_num, train_set, test_set, authors):
 def prepare_batches(batches):
     new_batches = {}
     for k, v in batches.items():
-        samples = [s for s in v if len(s.ast.all_nodes) > 150]
+        samples = [s for s in v if len(s.ast.all_nodes) > TOKEN_THRESHOLD]
         shuffle(samples)
         new_batches[k] = samples
     return new_batches
