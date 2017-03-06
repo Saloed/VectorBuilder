@@ -28,7 +28,7 @@ class Connection(BaseConnection):
         self.w_coeff = w_coeff
 
     def build_forward(self):
-        self.forward = tf.multiply(tf.matmul(self.weights, self.from_layer.forward), self.w_coeff)
+        self.forward = tf.multiply(tf.matmul(self.from_layer.forward, self.weights), self.w_coeff)
 
 
 class PoolConnection(BaseConnection):

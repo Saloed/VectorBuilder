@@ -178,21 +178,21 @@ def train_step(retry_num, train_set, test_set, authors):
     plot_axes, plot = new_figure(retry_num, NUM_EPOCH, 1)  # len(authors) + 1)
     saver = tf.train.Saver()
     with tf.Session() as sess, tf.device("/cpu:0"):
-        # sess.run(tf.global_variables_initializer())
+        sess.run(tf.global_variables_initializer())
 
-        graph_writer = tf.summary.FileWriter('TFAuthorClassifier/Graph', sess.graph)
-        run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
-        run_metadata = tf.RunMetadata()
-        sess.run(tf.global_variables_initializer(), options=run_options, run_metadata=run_metadata)
-        graph_writer.add_run_metadata(run_metadata, 'init')
-        run_metadata = tf.RunMetadata()
-        sess.run(feed_dict=nparams.emb_values, fetches=train_fun[0], options=run_options, run_metadata=run_metadata)
-        graph_writer.add_run_metadata(run_metadata, 'train')
-        run_metadata = tf.RunMetadata()
-        sess.run(feed_dict=nparams.emb_values, fetches=test_fun[0], options=run_options, run_metadata=run_metadata)
-        graph_writer.add_run_metadata(run_metadata, 'test')
-        graph_writer.close()
-        exit(99)
+        # graph_writer = tf.summary.FileWriter('TFAuthorClassifier/Graph', sess.graph)
+        # run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
+        # run_metadata = tf.RunMetadata()
+        # sess.run(tf.global_variables_initializer(), options=run_options, run_metadata=run_metadata)
+        # graph_writer.add_run_metadata(run_metadata, 'init')
+        # run_metadata = tf.RunMetadata()
+        # print(sess.run( fetches=train_fun[0], options=run_options, run_metadata=run_metadata))
+        # graph_writer.add_run_metadata(run_metadata, 'train')
+        # run_metadata = tf.RunMetadata()
+        # print(sess.run(fetches=test_fun[0], options=run_options, run_metadata=run_metadata))
+        # graph_writer.add_run_metadata(run_metadata, 'test')
+        # graph_writer.close()
+        # exit(99)
 
         for train_epoch in range(NUM_EPOCH):
             error = epoch_step(train_epoch, retry_num, train_fun, test_fun, sess)
@@ -240,16 +240,16 @@ def spec_main():
     np.set_printoptions(threshold=100000)
     gc.enable()
     # with open('Dataset/author_file_kylin', 'rb') as f:
-    # with open('Dataset/CombinedProjects/top_authors_MPS', 'rb') as f:
-    with open('TFAuthorClassifier/test_data', 'rb') as f:
+    with open('Dataset/CombinedProjects/top_authors_MPS', 'rb') as f:
+        # with open('TFAuthorClassifier/test_data', 'rb') as f:
         dataset = P.load(f)
-    # dataset = dataset[:5]
+    dataset = dataset[:5]
     indexes = range(len(dataset))
     r_index = {aa: i for i, a in enumerate(dataset) for aa in a[1]}
     authors = [(i, dataset[i][1]) for i in indexes]
     batches = {i: generate_batches(dataset[i][0], r_index) for i in indexes}
     batches = prepare_batches(batches)
-    train_set, test_set = divide_data_set(batches, 1, 1)
+    train_set, test_set = divide_data_set(batches, 40, 20)
     dataset, batches = (None, None)
     for train_retry in range(NUM_RETRY):
         train_step(train_retry, train_set, test_set, authors)
