@@ -11,6 +11,8 @@ from TFAuthorClassifier.TFParameters import NUM_FEATURES, Params, RANDOM_RANGE, 
     l2_param, learn_rate, NUM_EPOCH, SAVE_PERIOD
 from Utils.Wrappers import timing
 
+from Utils.Visualization import new_figure, update_figure, save_to_file
+
 
 class Net:
     def __init__(self, out, loss, error, pc):
@@ -300,6 +302,7 @@ def main():
     test_set = generate_batches(test_set, emb_indexes, r_index, net)
     saver = tf.train.Saver()
     for retry_num in range(5):
+        plot_axes, plot = new_figure(retry_num, NUM_EPOCH, 2)
         with tf.Session() as sess, tf.device('/cpu:0'):
             sess.run(tf.global_variables_initializer())
             for train_epoch in range(NUM_EPOCH):
@@ -321,6 +324,8 @@ def main():
                 logging.info('\n'.join(print_str))
                 if train_epoch % SAVE_PERIOD == 0:
                     saver.save(sess, 'TFAuthorClassifier/NewParams/model', retry_num * 10000 + train_epoch)
+                update_figure(plot, plot_axes, train_epoch, te_loss, tr_loss)
+        save_to_file(plot, 'retry{}.png'.format(retry_num))
 
 
 if __name__ == '__main__':
