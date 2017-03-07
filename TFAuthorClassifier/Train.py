@@ -177,7 +177,9 @@ def train_step(retry_num, train_set, test_set, authors):
 
     plot_axes, plot = new_figure(retry_num, NUM_EPOCH, 1)  # len(authors) + 1)
     saver = tf.train.Saver()
-    with tf.Session() as sess, tf.device("/cpu:0"):
+    config = tf.ConfigProto()
+    config.graph_options.optimizer_options.global_jit_level = tf.OptimizerOptions.ON_1
+    with tf.Session(config=config) as sess, tf.device("/cpu:0"):
         sess.run(tf.global_variables_initializer())
 
         # graph_writer = tf.summary.FileWriter('TFAuthorClassifier/Graph', sess.graph)
