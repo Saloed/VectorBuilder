@@ -261,7 +261,7 @@ def build_net(params):
         error = tf.reduce_mean(error)
         max_loss = tf.reduce_max(loss)
         cost = loss + l2
-    updates = tf.train.GradientDescentOptimizer(learn_rate).minimize(cost)
+    updates = tf.train.AdamOptimizer().minimize(cost)
     net = Net(out, loss, error, pc)
     net.max_loss = max_loss
     return updates, net
@@ -297,13 +297,15 @@ def main():
     params, emb_indexes = init_params(authors_amount)
     updates, net = build_net(params)
     batches = {i: dataset[i][0] for i in indexes}
-    train_set, test_set = divide_data_set(batches, 40, 20)
+    train_set, test_set = divide_data_set(batches, 500, 100)
     train_set = generate_batches(train_set, emb_indexes, r_index, net)
     test_set = generate_batches(test_set, emb_indexes, r_index, net)
     saver = tf.train.Saver()
     for retry_num in range(5):
         plot_axes, plot = new_figure(retry_num, NUM_EPOCH, 2)
-        with tf.Session() as sess, tf.device('/cpu:0'):
+        config = tf.ConfigProto()
+        config.graph_options.optimizer_options.global_jit_level = tf.OptimizerOptions.ON_1
+        with tf.Session(config=config) as sess, tf.device('/cpu:0'):
             sess.run(tf.global_variables_initializer())
             for train_epoch in range(NUM_EPOCH):
                 shuffle(train_set)
