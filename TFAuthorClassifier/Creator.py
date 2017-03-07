@@ -283,8 +283,10 @@ def process_set(batches, fun, is_train, session):
 
 
 def main():
-    with open('TFAuthorClassifier/test_data', 'rb') as f:
+    with open('Dataset/CombinedProjects/top_authors_MPS', 'rb') as f:
+        # with open('TFAuthorClassifier/test_data', 'rb') as f:
         dataset = P.load(f)
+    dataset = dataset[:5]
     logging.basicConfig(filename='log.txt', level=logging.INFO)
     logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
     indexes = range(len(dataset))
@@ -293,7 +295,7 @@ def main():
     params, emb_indexes = init_params(authors_amount)
     updates, net = build_net(params)
     batches = {i: dataset[i][0] for i in indexes}
-    train_set, test_set = divide_data_set(batches, 4, 2)
+    train_set, test_set = divide_data_set(batches, 40, 20)
     train_set = generate_batches(train_set, emb_indexes, r_index, net)
     test_set = generate_batches(test_set, emb_indexes, r_index, net)
     saver = tf.train.Saver()
