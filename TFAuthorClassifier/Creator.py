@@ -1,5 +1,5 @@
 import sys
-from collections import OrderedDict
+from collections import OrderedDict, namedtuple
 from random import randint, shuffle
 import logging
 import tensorflow as tf
@@ -15,11 +15,11 @@ from Utils.Visualization import new_figure, update_figure, save_to_file
 
 
 class Net:
-    def __init__(self, out, loss, error, pc):
+    def __init__(self, out, loss, error, max_loss, pc):
         self.out = out
         self.loss = loss
         self.error = error
-        self.max_loss = -1
+        self.max_loss = max_loss
         self.placeholders = pc
 
 
@@ -72,7 +72,7 @@ def compute_rates(root_node: Token):
 
 
 def prepare_batch(ast: Nodes, emb_indexes, r_index):
-    target = [r_index[ast.root_node.author][1]]
+    target = [r_index[ast.root_node.author]]
     nodes = ast.all_nodes
     compute_rates(ast.root_node)
     compute_leaf_num(ast.root_node, nodes)
@@ -137,14 +137,14 @@ def init_params(author_amount):
                   embeddings), emb_indexes
 
 
-def create(params):
+def create_convolution(params):
     embeddings = params.embeddings
     root_nodes = tf.placeholder(tf.int32, [None], 'node_indexes')
     node_children = tf.placeholder(tf.int32, [None, None], 'node_children')
     node_emb = tf.placeholder(tf.int32, [None], 'node_emb')
     node_left_coef = tf.placeholder(tf.float32, [None], 'left_coef')
     node_right_coef = tf.placeholder(tf.float32, [None], 'right_coef')
-    target = tf.placeholder(tf.int64, [None], 'target')
+    target = tf.placeholder(tf.int64, [1], 'target')
 
     pooling = tf.TensorArray(
         tf.float32,
@@ -188,6 +188,20 @@ def create(params):
     with tf.name_scope('Convolution'):
         pooling, _ = tf.while_loop(loop_cond, convolve, [pooling, 0])
         convolution = tf.reduce_max(pooling.concat(), 0, keep_dims=True)
+    return convolution, Placeholders(root_nodes, node_children, node_emb, node_left_coef, node_right_coef, target)
+
+
+def create(params):
+    placeholders = []
+    convolutions = []
+    targets = []
+    for _ in range(BATCH_SIZE):
+        conv, pc = create_convolution(params)
+        convolutions.append(conv)
+        placeholders.append(pc)
+        targets.append(pc.target)
+    convolution = tf.stack(convolutions, name='convolution')
+    target = tf.stack(targets, name='target')
     with tf.name_scope('Hidden'):
         hid_layer = tf.nn.sigmoid(tf.matmul(convolution, params.w['w_hid']) + params.b['b_hid'])
     with tf.name_scope('Out'):
@@ -196,40 +210,27 @@ def create(params):
     with tf.name_scope('Error'):
         loss = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits, labels=target)
         error = tf.cast(tf.not_equal(tf.argmax(out, 1), target), tf.float32)
-    return Net(out, loss, error,
-               Placeholders(root_nodes, node_children, node_emb, node_left_coef, node_right_coef, target))
+        loss = tf.reduce_mean(loss)
+        error = tf.reduce_mean(error)
+        max_loss = tf.reduce_max(loss)
+    return Net(out, loss, error, max_loss, placeholders)
 
 
-def divide_data_set(data_set, train_units, test_units):
-    train_set = []
-    test_set = []
-
-    for i in range(train_units):
-        for k, itm in data_set.items():
-            size = len(itm)
-            if i > size - test_units:
-                pos = randint(0, size - test_units)
-                train_set.append(itm[pos])
-            else:
-                train_set.append(itm[i])
-
-    for i in range(test_units):
-        for k, itm in data_set.items():
-            test_set.append(itm[len(itm) - 1 - i])
-
-    return train_set, test_set
+def divide_data_set(data_set, train_units, valid_units, test_units):
+    data_set = list(zip(list(data_set.values())))
+    if train_units + valid_units + test_units > len(data_set):
+        raise Exception('Too much units to divide')
+    shuffle(data_set)
+    train_set = [d for data in data_set[:train_units] for d in data]
+    v_end = train_units + valid_units
+    valid_set = [d for data in data_set[train_units:v_end] for d in data]
+    test_set = [d for data in data_set[v_end:v_end + test_units] for d in data]
+    return train_set, valid_set, test_set
 
 
 def build_vectors(authors):
-    index = {}
     size = len(authors)
-    # assuming that we have only two authors
-    for uauthor in authors:
-        for author in uauthor[1]:
-            vec = [0] * size
-            vec[uauthor[0]] = 1
-            vec = np.expand_dims(vec, 0)
-            index[author] = (vec, uauthor[0])
+    index = {author: uauthor[0] for uauthor in authors for author in uauthor[1]}
     return size, index
 
 
@@ -248,22 +249,12 @@ def generate_batches(dataset, emb_indexes, r_index, net):
 
 
 def build_net(params):
-    nets = [create(params) for _ in range(BATCH_SIZE)]
-    loss = [net.loss for net in nets]
-    error = [net.error for net in nets]
-    out = [net.out for net in nets]
-    pc = [net.placeholders for net in nets]
-    with tf.name_scope('NetLoss'):
-        with tf.name_scope('L2_Loss'):
-            reg_weights = [tf.nn.l2_loss(p) for p in params.w.values()]
-            l2 = l2_param * tf.reduce_sum(reg_weights)
-        loss = tf.reduce_mean(loss)
-        error = tf.reduce_mean(error)
-        max_loss = tf.reduce_max(loss)
-        cost = loss + l2
-    updates = tf.train.GradientDescentOptimizer(learn_rate).minimize(cost)
-    net = Net(out, loss, error, pc)
-    net.max_loss = max_loss
+    net = create(params)
+    with tf.name_scope('L2_Loss'):
+        reg_weights = [tf.nn.l2_loss(p) for p in params.w.values()]
+        l2 = l2_param * tf.reduce_sum(reg_weights)
+    cost = net.loss + l2
+    updates = tf.train.AdamOptimizer().minimize(cost)
     return updates, net
 
 
@@ -284,22 +275,33 @@ def process_set(batches, fun, is_train, session):
     return loss, loss_max, err
 
 
-def main():
+DataSet = namedtuple('DataSet', ['test', 'valid', 'train', 'r_index', 'amount'])
+
+
+def divide_dataset():
     with open('Dataset/CombinedProjects/top_authors_MPS', 'rb') as f:
         # with open('TFAuthorClassifier/test_data', 'rb') as f:
         dataset = P.load(f)
     dataset = dataset[:5]
-    logging.basicConfig(filename='log.txt', level=logging.INFO)
-    logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
     indexes = range(len(dataset))
     authors = [(i, dataset[i][1]) for i in indexes]
     authors_amount, r_index = build_vectors(authors)
-    params, emb_indexes = init_params(authors_amount)
-    updates, net = build_net(params)
     batches = {i: dataset[i][0] for i in indexes}
-    train_set, test_set = divide_data_set(batches, 40, 20)
-    train_set = generate_batches(train_set, emb_indexes, r_index, net)
-    test_set = generate_batches(test_set, emb_indexes, r_index, net)
+    train_set, valid_set, test_set = divide_data_set(batches, 100, 50, 100)
+    dataset = DataSet(test_set, valid_set, train_set, r_index, authors_amount)
+    with open('Dataset/CombinedProjects/top_authors_MPS_data', 'wb') as f:
+        P.dump(dataset, f)
+
+
+def main():
+    logging.basicConfig(filename='log.txt', level=logging.INFO)
+    logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
+    with open('Dataset/CombinedProjects/top_authors_MPS_data', 'rb') as f:
+        dataset = P.load(f)  # type: DataSet
+    params, emb_indexes = init_params(dataset.amount)
+    updates, net = build_net(params)
+    train_set = generate_batches(dataset.train, emb_indexes, dataset.r_index, net)
+    test_set = generate_batches(dataset.valid, emb_indexes, dataset.r_index, net)
     saver = tf.train.Saver()
     for retry_num in range(5):
         plot_axes, plot = new_figure(retry_num, NUM_EPOCH, 2)
