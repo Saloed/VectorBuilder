@@ -1,17 +1,18 @@
+import _pickle as P
+import logging
 import sys
 from collections import OrderedDict, namedtuple
-from random import randint, shuffle
-import logging
-import tensorflow as tf
-import _pickle as P
+from random import shuffle
+
 import numpy as np
+import tensorflow as tf
+
 from AST.Token import Token
 from AST.Tokenizer import Nodes
 from TFAuthorClassifier.TFParameters import NUM_FEATURES, Params, RANDOM_RANGE, NUM_CONVOLUTION, NUM_HIDDEN, BATCH_SIZE, \
-    l2_param, learn_rate, NUM_EPOCH, SAVE_PERIOD
-from Utils.Wrappers import timing
-
+    l2_param, NUM_EPOCH, SAVE_PERIOD
 from Utils.Visualization import new_figure, update_figure, save_to_file
+from Utils.Wrappers import timing
 
 
 class Net:
@@ -100,15 +101,16 @@ def prepare_batch(ast: Nodes, emb_indexes, r_index):
 
 
 def rand_weight(shape_0, shape_1, name):
-    return tf.Variable(
-        tf.truncated_normal(shape=[shape_1, shape_0], stddev=RANDOM_RANGE),
-        name=name)
+    with tf.name_scope(name):
+        var = tf.Variable(
+            tf.truncated_normal(shape=[shape_1, shape_0], stddev=RANDOM_RANGE),
+            name=name)
+        variable_summaries(var)
+    return var
 
 
 def rand_bias(shape, name):
-    return tf.Variable(
-        tf.truncated_normal(shape=[1, shape], stddev=RANDOM_RANGE),
-        name=name)
+    return rand_weight(shape, 1, name)
 
 
 def init_params(author_amount):
@@ -255,7 +257,8 @@ def build_net(params):
         l2 = l2_param * tf.reduce_sum(reg_weights)
     cost = net.loss + l2
     updates = tf.train.AdamOptimizer().minimize(cost)
-    return updates, net
+    summaries = tf.summary.merge_all()
+    return updates, net, summaries
 
 
 @timing
@@ -293,19 +296,35 @@ def divide_dataset():
         P.dump(dataset, f)
 
 
+def variable_summaries(var):
+    """Attach a lot of summaries to a Tensor (for TensorBoard visualization)."""
+    with tf.name_scope('summaries'):
+        mean = tf.reduce_mean(var)
+        tf.summary.scalar('mean', mean)
+        with tf.name_scope('stddev'):
+            stddev = tf.sqrt(tf.reduce_mean(tf.square(var - mean)))
+        tf.summary.scalar('stddev', stddev)
+        tf.summary.scalar('max', tf.reduce_max(var))
+        tf.summary.scalar('min', tf.reduce_min(var))
+        tf.summary.histogram('histogram', var)
+
+
 def main():
     logging.basicConfig(filename='log.txt', level=logging.INFO)
     logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
     with open('Dataset/CombinedProjects/top_authors_MPS_data', 'rb') as f:
         dataset = P.load(f)  # type: DataSet
     params, emb_indexes = init_params(dataset.amount)
-    updates, net = build_net(params)
+    updates, net, summaries = build_net(params)
     train_set = generate_batches(dataset.train, emb_indexes, dataset.r_index, net)
     test_set = generate_batches(dataset.valid, emb_indexes, dataset.r_index, net)
     saver = tf.train.Saver()
     for retry_num in range(5):
         plot_axes, plot = new_figure(retry_num, NUM_EPOCH, 2)
-        with tf.Session() as sess, tf.device('/cpu:0'):
+        config = tf.ConfigProto()
+        config.graph_options.optimizer_options.global_jit_level = tf.OptimizerOptions.ON_1
+        with tf.Session(config=config) as sess, tf.device('/cpu:0'):
+            summary_writer = tf.summary.FileWriter('Summary', sess.graph)
             sess.run(tf.global_variables_initializer())
             for train_epoch in range(NUM_EPOCH):
                 shuffle(train_set)
@@ -327,7 +346,10 @@ def main():
                 if train_epoch % SAVE_PERIOD == 0:
                     saver.save(sess, 'TFAuthorClassifier/NewParams/model', retry_num * 10000 + train_epoch)
                 update_figure(plot, plot_axes, train_epoch, te_loss, tr_loss)
+                info = sess.run(fetches=[summaries])
+                summary_writer.add_summary(info, train_epoch)
         save_to_file(plot, 'retry{}.png'.format(retry_num))
+        summary_writer.close()
 
 
 if __name__ == '__main__':
