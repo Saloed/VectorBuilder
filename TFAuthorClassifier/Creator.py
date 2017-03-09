@@ -141,19 +141,14 @@ def init_params(author_amount):
 
 def create_convolution(params):
     embeddings = params.embeddings
-    root_nodes = tf.placeholder(tf.int32, [None], 'node_indexes')
-    node_children = tf.placeholder(tf.int32, [None, None], 'node_children')
-    node_emb = tf.placeholder(tf.int32, [None], 'node_emb')
-    node_left_coef = tf.placeholder(tf.float32, [None], 'left_coef')
-    node_right_coef = tf.placeholder(tf.float32, [None], 'right_coef')
-    target = tf.placeholder(tf.int64, [1], 'target')
-
-    pooling = tf.TensorArray(
-        tf.float32,
-        size=0,
-        dynamic_size=True,
-        clear_after_read=False,
-        element_shape=[1, NUM_CONVOLUTION])
+    with tf.name_scope('Placeholders'):
+        root_nodes = tf.placeholder(tf.int32, [None], 'node_indexes')
+        node_children = tf.placeholder(tf.int32, [None, None], 'node_children')
+        node_emb = tf.placeholder(tf.int32, [None], 'node_emb')
+        node_left_coef = tf.placeholder(tf.float32, [None], 'left_coef')
+        node_right_coef = tf.placeholder(tf.float32, [None], 'right_coef')
+    with tf.name_scope('Target'):
+        target = tf.placeholder(tf.int64, [1], 'target')
 
     def loop_cond(_, i):
         return tf.less(i, tf.squeeze(tf.shape(root_nodes)))
@@ -187,9 +182,16 @@ def create_convolution(params):
         i = tf.add(i, 1)
         return pool, i
 
-    with tf.name_scope('Convolution'):
+    with tf.name_scope('Pooling'):
+        pooling = tf.TensorArray(
+            tf.float32,
+            size=0,
+            dynamic_size=True,
+            clear_after_read=False,
+            element_shape=[1, NUM_CONVOLUTION])
         pooling, _ = tf.while_loop(loop_cond, convolve, [pooling, 0])
         convolution = tf.reduce_max(pooling.concat(), 0, keep_dims=True)
+
     return convolution, Placeholders(root_nodes, node_children, node_emb, node_left_coef, node_right_coef, target)
 
 
@@ -197,13 +199,14 @@ def create(params):
     placeholders = []
     convolutions = []
     targets = []
-    for _ in range(BATCH_SIZE):
-        conv, pc = create_convolution(params)
-        convolutions.append(conv)
-        placeholders.append(pc)
-        targets.append(pc.target)
-    convolution = tf.stack(convolutions, name='convolution')
-    target = tf.stack(targets, name='target')
+    with tf.name_scope('Convolution'):
+        for _ in range(BATCH_SIZE):
+            conv, pc = create_convolution(params)
+            convolutions.append(conv)
+            placeholders.append(pc)
+            targets.append(pc.target)
+        convolution = tf.concat(convolutions, axis=0, name='convolution')
+    target = tf.concat(targets, axis=0, name='target')
     with tf.name_scope('Hidden'):
         hid_layer = tf.nn.sigmoid(tf.matmul(convolution, params.w['w_hid']) + params.b['b_hid'])
     with tf.name_scope('Out'):
@@ -219,7 +222,7 @@ def create(params):
 
 
 def divide_data_set(data_set, train_units, valid_units, test_units):
-    data_set = list(zip(list(data_set.values())))
+    data_set = list(zip(*data_set.values()))
     if train_units + valid_units + test_units > len(data_set):
         raise Exception('Too much units to divide')
     shuffle(data_set)
@@ -290,9 +293,10 @@ def divide_dataset():
     authors = [(i, dataset[i][1]) for i in indexes]
     authors_amount, r_index = build_vectors(authors)
     batches = {i: dataset[i][0] for i in indexes}
-    train_set, valid_set, test_set = divide_data_set(batches, 100, 50, 100)
+    train_set, valid_set, test_set = divide_data_set(batches, 800, 200, 600)
     dataset = DataSet(test_set, valid_set, train_set, r_index, authors_amount)
     with open('Dataset/CombinedProjects/top_authors_MPS_data', 'wb') as f:
+        # with open('TFAuthorClassifier/test_data_data', 'wb') as f:
         P.dump(dataset, f)
 
 
@@ -312,7 +316,8 @@ def variable_summaries(var):
 def main():
     logging.basicConfig(filename='log.txt', level=logging.INFO)
     logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
-    with open('Dataset/CombinedProjects/top_authors_MPS_data', 'rb') as f:
+    # with open('Dataset/CombinedProjects/top_authors_MPS_data', 'rb') as f:
+    with open('TFAuthorClassifier/test_data_data', 'rb') as f:
         dataset = P.load(f)  # type: DataSet
     params, emb_indexes = init_params(dataset.amount)
     updates, net, summaries = build_net(params)
@@ -324,14 +329,13 @@ def main():
         config = tf.ConfigProto()
         config.graph_options.optimizer_options.global_jit_level = tf.OptimizerOptions.ON_1
         with tf.Session(config=config) as sess, tf.device('/cpu:0'):
-            summary_writer = tf.summary.FileWriter('Summary', sess.graph)
+            summary_writer = tf.summary.FileWriter('TFAuthorClassifier/Summary', sess.graph)
             sess.run(tf.global_variables_initializer())
             for train_epoch in range(NUM_EPOCH):
                 shuffle(train_set)
                 tr_loss, tr_max, tr_err = process_set(train_set, [net.loss, net.max_loss, net.error, updates], True,
                                                       sess)
                 te_loss, te_max, te_err = process_set(test_set, [net.loss, net.max_loss, net.error], False, sess)
-
                 print_str = [
                     'epoch {0} retry {1}'.format(train_epoch, retry_num),
                     'train | mean {0:.4f} | max {1:.4f} | percent {2:.2f}'.format(float(tr_loss),
@@ -346,11 +350,12 @@ def main():
                 if train_epoch % SAVE_PERIOD == 0:
                     saver.save(sess, 'TFAuthorClassifier/NewParams/model', retry_num * 10000 + train_epoch)
                 update_figure(plot, plot_axes, train_epoch, te_loss, tr_loss)
-                info = sess.run(fetches=[summaries])
+                info = sess.run(fetches=summaries)
                 summary_writer.add_summary(info, train_epoch)
         save_to_file(plot, 'retry{}.png'.format(retry_num))
         summary_writer.close()
 
 
 if __name__ == '__main__':
-    main()
+    # main()
+    divide_dataset()
