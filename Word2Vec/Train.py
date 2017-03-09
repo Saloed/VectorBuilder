@@ -5,7 +5,7 @@ import tensorflow as tf
 from theano import shared
 
 from AST.Sampler import build_psi_text
-from AuthorClassifier.ClassifierParams import NUM_FEATURES
+from TFAuthorClassifier.TFParameters import NUM_FEATURES
 from Embeddings.Parameters import Parameters
 from Word2Vec import word2vec_optimized as word2vec
 from Word2Vec.word2vec_optimized import Word2Vec

@@ -1,6 +1,27 @@
-import _pickle as P
-import tensorflow as tf
-from AuthorClassifier.ClassifierParams import *
+NUM_FEATURES = 100
+
+margin = 1
+learn_rate = 0.07  # 0.0001
+beta = .0001
+momentum = 0.1
+l2_param = 5.e-5
+clip_const = 1.e-2
+
+NUM_CONVOLUTION = 800  # 50
+NUM_DISCRIMINATIVE = 30  # 50
+NUM_OUT_LAYER = 10
+NUM_POOLING = 3
+
+NUM_HIDDEN = 80
+SAVE_PERIOD = 20
+BATCH_SIZE = 20
+
+TOKEN_THRESHOLD = 0
+
+RANDOM_RANGE = 0.02
+
+NUM_RETRY = 200
+NUM_EPOCH = 1000
 
 
 class Params:
@@ -23,37 +44,3 @@ class Params:
         }
 
         self.embeddings = embeddings
-
-
-def rand_weight(shape_0, shape_1, name):
-    return tf.Variable(
-        tf.truncated_normal(shape=[shape_1, shape_0], stddev=RANDOM_RANGE),
-        name=name)
-
-
-def rand_bias(shape, name):
-    return tf.Variable(
-        tf.truncated_normal(shape=[1, shape], stddev=RANDOM_RANGE),
-        name=name)
-
-
-def init_params(author_amount):
-    with open('TFAuthorClassifier/embeddings', 'rb') as f:
-        np_embs = P.load(f)
-    with tf.name_scope('Embeddings'):
-        embeddings = {name: tf.constant(val, tf.float32, [1, NUM_FEATURES], name) for name, val
-                      in np_embs.items()}
-    with tf.name_scope('Params'):
-        w_conv_root = rand_weight(NUM_CONVOLUTION, NUM_FEATURES, 'w_conv_root')
-        w_conv_left = rand_weight(NUM_CONVOLUTION, NUM_FEATURES, 'w_conv_left')
-        w_conv_right = rand_weight(NUM_CONVOLUTION, NUM_FEATURES, 'w_conv_right')
-        w_hid = rand_weight(NUM_HIDDEN, NUM_CONVOLUTION, 'w_hid')
-        w_out = rand_weight(author_amount, NUM_HIDDEN, 'w_out')
-
-        b_conv = rand_bias(NUM_CONVOLUTION, 'b_conv')
-        b_hid = rand_bias(NUM_HIDDEN, 'b_hid')
-        b_out = rand_bias(author_amount, 'b_out')
-
-    return Params(w_conv_root, w_conv_left, w_conv_right,
-                  w_hid, w_out, b_conv, b_hid, b_out,
-                  embeddings)

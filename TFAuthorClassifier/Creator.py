@@ -9,8 +9,7 @@ import tensorflow as tf
 
 from AST.Token import Token
 from AST.Tokenizer import Nodes
-from TFAuthorClassifier.TFParameters import NUM_FEATURES, Params, RANDOM_RANGE, NUM_CONVOLUTION, NUM_HIDDEN, BATCH_SIZE, \
-    l2_param, NUM_EPOCH, SAVE_PERIOD
+from TFAuthorClassifier.TFParameters import *
 from Utils.Visualization import new_figure, update_figure, save_to_file
 from Utils.Wrappers import timing
 
@@ -316,8 +315,8 @@ def variable_summaries(var):
 def main():
     logging.basicConfig(filename='log.txt', level=logging.INFO)
     logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
-    # with open('Dataset/CombinedProjects/top_authors_MPS_data', 'rb') as f:
-    with open('TFAuthorClassifier/test_data_data', 'rb') as f:
+    with open('Dataset/CombinedProjects/top_authors_MPS_data', 'rb') as f:
+        # with open('TFAuthorClassifier/test_data_data', 'rb') as f:
         dataset = P.load(f)  # type: DataSet
     params, emb_indexes = init_params(dataset.amount)
     updates, net, summaries = build_net(params)
@@ -347,7 +346,8 @@ def main():
                     '################'
                 ]
                 logging.info('\n'.join(print_str))
-                if train_epoch % SAVE_PERIOD == 0:
+                # if train_epoch % SAVE_PERIOD == 0:
+                if True:
                     saver.save(sess, 'TFAuthorClassifier/NewParams/model', retry_num * 10000 + train_epoch)
                 update_figure(plot, plot_axes, train_epoch, te_loss, tr_loss)
                 info = sess.run(fetches=summaries)
@@ -357,5 +357,5 @@ def main():
 
 
 if __name__ == '__main__':
-    # main()
-    divide_dataset()
+    main()
+    # divide_dataset()
