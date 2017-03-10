@@ -1,0 +1,124 @@
+import tensorflow as tf
+
+from TFAuthorClassifier.TFParameters import NUM_CONVOLUTION, BATCH_SIZE, L2_PARAM
+
+
+class Net:
+    def __init__(self, out, loss, error, max_loss, pc):
+        self.out = out
+        self.loss = loss
+        self.error = error
+        self.max_loss = max_loss
+        self.placeholders = pc
+
+
+class Placeholders:
+    def __init__(self, root_nodes, node_children, node_emb, node_left_coef, node_right_coef, target):
+        self.root_nodes = root_nodes
+        self.node_children = node_children
+        self.node_emb = node_emb
+        self.node_left_coef = node_left_coef
+        self.node_right_coef = node_right_coef
+        self.target = target
+
+    def assign(self, placeholders):
+        pc = placeholders  # type: Placeholders
+        return {self.root_nodes: pc.root_nodes,
+                self.node_emb: pc.node_emb,
+                self.node_children: pc.node_children,
+                self.node_left_coef: pc.node_left_coef,
+                self.node_right_coef: pc.node_right_coef,
+                self.target: pc.target}
+
+
+def create_convolution(params):
+    embeddings = params.embeddings
+    with tf.name_scope('Placeholders'):
+        root_nodes = tf.placeholder(tf.int32, [None], 'node_indexes')
+        node_children = tf.placeholder(tf.int32, [None, None], 'node_children')
+        node_emb = tf.placeholder(tf.int32, [None], 'node_emb')
+        node_left_coef = tf.placeholder(tf.float32, [None], 'left_coef')
+        node_right_coef = tf.placeholder(tf.float32, [None], 'right_coef')
+    with tf.name_scope('Target'):
+        target = tf.placeholder(tf.int64, [1], 'target')
+
+    def loop_cond(_, i):
+        return tf.less(i, tf.squeeze(tf.shape(root_nodes)))
+
+    def convolve(pool, i):
+        root_emb = tf.gather(root_nodes, i)
+        root_ch_i = tf.gather(node_children, i)
+        children_emb_i = tf.gather(node_emb, root_ch_i)
+        root = tf.gather(embeddings, root_emb)
+        root = tf.expand_dims(root, 0)
+        children_emb = tf.gather(embeddings, children_emb_i)
+        children_l_coef = tf.gather(node_left_coef, root_ch_i)
+        children_r_coef = tf.gather(node_right_coef, root_ch_i)
+        children_l_coef = tf.expand_dims(children_l_coef, 1)
+        children_r_coef = tf.expand_dims(children_r_coef, 1)
+
+        root = tf.matmul(root, params.w['w_conv_root'])
+
+        left_ch = tf.matmul(children_emb, params.w['w_conv_left'])
+        right_ch = tf.matmul(children_emb, params.w['w_conv_right'])
+
+        left_ch = tf.multiply(left_ch, children_l_coef)
+        right_ch = tf.multiply(right_ch, children_r_coef)
+
+        z = tf.concat([left_ch, right_ch, root], 0)
+        z = tf.reduce_sum(z, 0)
+        z = tf.add(z, params.b['b_conv'])
+        conv = tf.nn.relu(z)
+
+        pool = pool.write(i, conv)
+        i = tf.add(i, 1)
+        return pool, i
+
+    with tf.name_scope('Pooling'):
+        pooling = tf.TensorArray(
+            tf.float32,
+            size=0,
+            dynamic_size=True,
+            clear_after_read=False,
+            element_shape=[1, NUM_CONVOLUTION])
+        pooling, _ = tf.while_loop(loop_cond, convolve, [pooling, 0])
+        convolution = tf.reduce_max(pooling.concat(), 0, keep_dims=True)
+
+    return convolution, Placeholders(root_nodes, node_children, node_emb, node_left_coef, node_right_coef, target)
+
+
+def create(params):
+    placeholders = []
+    convolutions = []
+    targets = []
+    with tf.name_scope('Convolution'):
+        for _ in range(BATCH_SIZE):
+            conv, pc = create_convolution(params)
+            convolutions.append(conv)
+            placeholders.append(pc)
+            targets.append(pc.target)
+        convolution = tf.concat(convolutions, axis=0, name='convolution')
+    target = tf.concat(targets, axis=0, name='target')
+    with tf.name_scope('Hidden'):
+        hid_layer = tf.nn.sigmoid(tf.matmul(convolution, params.w['w_hid']) + params.b['b_hid'])
+    with tf.name_scope('Out'):
+        logits = tf.matmul(hid_layer, params.w['w_out'] + params.b['b_out'])
+        out = tf.nn.softmax(logits)
+    with tf.name_scope('Error'):
+        loss = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits, labels=target)
+        error = tf.cast(tf.not_equal(tf.argmax(out, 1), target), tf.float32)
+        loss = tf.reduce_mean(loss)
+        error = tf.reduce_mean(error)
+        max_loss = tf.reduce_max(loss)
+    return Net(out, loss, error, max_loss, placeholders)
+
+
+def build_net(params):
+    net = create(params)
+    with tf.name_scope('L2_Loss'):
+        reg_weights = [tf.nn.l2_loss(p) for p in params.w.values()]
+        l2 = L2_PARAM * tf.reduce_sum(reg_weights)
+    cost = net.loss + l2
+    updates = tf.train.AdamOptimizer().minimize(cost)
+    summaries = tf.summary.merge_all()
+    return updates, net, summaries
