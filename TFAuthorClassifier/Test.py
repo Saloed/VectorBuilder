@@ -2,7 +2,6 @@ import sys
 import _pickle as P
 
 import logging
-import numpy as np
 import tensorflow as tf
 from TFAuthorClassifier.BatchBuilder import generate_batches
 from TFAuthorClassifier.DataPreparation import DataSet
@@ -29,9 +28,8 @@ def main():
     with tf.Session(config=config) as sess, tf.device('/cpu:0'):
         saver.restore(sess, model_name)
         for feed in test_set:
-            res = sess.run(fetches=net.out, feed_dict=feed)
+            res = sess.run(fetches=tf.arg_max(net.out,1), feed_dict=feed)
             tar = sess.run(fetches=targets, feed_dict=feed)
-            res = np.argmax(res, axis=0)
             for i, r in enumerate(res):
                 cm.add(r, tar[i])
     cm.calc()
