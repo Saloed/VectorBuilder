@@ -1,4 +1,4 @@
-import pickle as P
+import _pickle as P
 from collections import namedtuple
 from random import shuffle
 

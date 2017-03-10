@@ -1,4 +1,4 @@
-import pickle as P
+import _pickle as P
 from collections import OrderedDict
 
 import numpy as np

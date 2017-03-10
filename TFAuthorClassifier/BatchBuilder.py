@@ -43,16 +43,16 @@ def prepare_batch(ast: Nodes, emb_indexes, r_index):
     ast.all_nodes.sort(key=lambda x: x.index)
     pc.root_nodes = [emb_indexes[node.token_type] for node in ast.non_leafs]
     pc.node_emb = [emb_indexes[node.token_type] for node in ast.all_nodes]
-    pc.node_left_coef = [node.left_rate for node in ast.all_nodes]
-    pc.node_right_coef = [node.right_rate for node in ast.all_nodes]
+    pc.node_left_c = [node.left_rate for node in ast.all_nodes]
+    pc.node_right_c = [node.right_rate for node in ast.all_nodes]
     zero_node_index = len(pc.node_emb)
     pc.node_emb.append(emb_indexes['ZERO_EMB'])
-    pc.node_left_coef.append(0.0)
-    pc.node_right_coef.append(0.0)
+    pc.node_left_c.append(0.0)
+    pc.node_right_c.append(0.0)
     max_children_len = max([len(node.children) for node in ast.non_leafs])
 
-    def align_nodes(nodes):
-        result = [node.index for node in nodes]
+    def align_nodes(_nodes):
+        result = [node.index for node in _nodes]
         while len(result) != max_children_len:
             result.append(zero_node_index)
         return result

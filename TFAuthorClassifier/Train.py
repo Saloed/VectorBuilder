@@ -32,11 +32,11 @@ def main():
     logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
     with open('Dataset/CombinedProjects/top_authors_MPS_data', 'rb') as f:
         # with open('TFAuthorClassifier/test_data_data', 'rb') as f:
-        dataset = P.load(f)  # type: DataSet
-    params, emb_indexes = init_params(dataset.amount)
+        data_set = P.load(f)  # type: DataSet
+    params, emb_indexes = init_params(data_set.amount)
     updates, net, summaries = build_net(params)
-    train_set = generate_batches(dataset.train, emb_indexes, dataset.r_index, net)
-    test_set = generate_batches(dataset.valid, emb_indexes, dataset.r_index, net)
+    train_set = generate_batches(data_set.train, emb_indexes, data_set.r_index, net)
+    test_set = generate_batches(data_set.valid, emb_indexes, data_set.r_index, net)
     saver = tf.train.Saver()
     for retry_num in range(5):
         plot_axes, plot = new_figure(retry_num, NUM_EPOCH, 2)

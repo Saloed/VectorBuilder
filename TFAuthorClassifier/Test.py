@@ -17,12 +17,12 @@ def main():
     logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
     with open('Dataset/CombinedProjects/top_authors_MPS_data', 'rb') as f:
         # with open('TFAuthorClassifier/test_data_data', 'rb') as f:
-        dataset = P.load(f)  # type: DataSet
-    params, emb_indexes = init_params(dataset.amount)
+        data_set = P.load(f)  # type: DataSet
+    params, emb_indexes = init_params(data_set.amount)
     updates, net, summaries = build_net(params)
-    test_set = generate_batches(dataset.test, emb_indexes, dataset.r_index, net)
+    test_set = generate_batches(data_set.test, emb_indexes, data_set.r_index, net)
     targets = [pc.target for pc in test_set[0].keys()]
-    cm = ConfMatrix(dataset.amount)
+    cm = ConfMatrix(data_set.amount)
     saver = tf.train.Saver()
     config = tf.ConfigProto()
     config.graph_options.optimizer_options.global_jit_level = tf.OptimizerOptions.ON_1

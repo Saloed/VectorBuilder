@@ -17,8 +17,8 @@ class Placeholders:
         self.root_nodes = None
         self.node_children = None
         self.node_emb = None
-        self.node_left_coef = None
-        self.node_right_coef = None
+        self.node_left_c = None
+        self.node_right_c = None
         self.target = None
 
     def assign(self, placeholders):
@@ -26,8 +26,8 @@ class Placeholders:
         return {self.root_nodes: pc.root_nodes,
                 self.node_emb: pc.node_emb,
                 self.node_children: pc.node_children,
-                self.node_left_coef: pc.node_left_coef,
-                self.node_right_coef: pc.node_right_coef,
+                self.node_left_c: pc.node_left_c,
+                self.node_right_c: pc.node_right_c,
                 self.target: pc.target}
 
 
@@ -38,8 +38,8 @@ def create_convolution(params):
         pc.root_nodes = tf.placeholder(tf.int32, [None], 'node_indexes')
         pc.node_children = tf.placeholder(tf.int32, [None, None], 'node_children')
         pc.node_emb = tf.placeholder(tf.int32, [None], 'node_emb')
-        pc.node_left_coef = tf.placeholder(tf.float32, [None], 'left_coef')
-        pc.node_right_coef = tf.placeholder(tf.float32, [None], 'right_coef')
+        pc.node_left_c = tf.placeholder(tf.float32, [None], 'left_c')
+        pc.node_right_c = tf.placeholder(tf.float32, [None], 'right_c')
 
     with tf.name_scope('Target'):
         pc.target = tf.placeholder(tf.int64, [1], 'target')
@@ -54,18 +54,18 @@ def create_convolution(params):
         root = tf.gather(embeddings, root_emb)
         root = tf.expand_dims(root, 0)
         children_emb = tf.gather(embeddings, children_emb_i)
-        children_l_coef = tf.gather(pc.node_left_coef, root_ch_i)
-        children_r_coef = tf.gather(pc.node_right_coef, root_ch_i)
-        children_l_coef = tf.expand_dims(children_l_coef, 1)
-        children_r_coef = tf.expand_dims(children_r_coef, 1)
+        children_l_c = tf.gather(pc.node_left_c, root_ch_i)
+        children_r_c = tf.gather(pc.node_right_c, root_ch_i)
+        children_l_c = tf.expand_dims(children_l_c, 1)
+        children_r_c = tf.expand_dims(children_r_c, 1)
 
         root = tf.matmul(root, params.w['w_conv_root'])
 
         left_ch = tf.matmul(children_emb, params.w['w_conv_left'])
         right_ch = tf.matmul(children_emb, params.w['w_conv_right'])
 
-        left_ch = tf.multiply(left_ch, children_l_coef)
-        right_ch = tf.multiply(right_ch, children_r_coef)
+        left_ch = tf.multiply(left_ch, children_l_c)
+        right_ch = tf.multiply(right_ch, children_r_c)
 
         z = tf.concat([left_ch, right_ch, root], 0)
         z = tf.reduce_sum(z, 0)
