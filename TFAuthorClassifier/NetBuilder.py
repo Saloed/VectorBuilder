@@ -13,13 +13,13 @@ class Net:
 
 
 class Placeholders:
-    def __init__(self, root_nodes, node_children, node_emb, node_left_coef, node_right_coef, target):
-        self.root_nodes = root_nodes
-        self.node_children = node_children
-        self.node_emb = node_emb
-        self.node_left_coef = node_left_coef
-        self.node_right_coef = node_right_coef
-        self.target = target
+    def __init__(self):
+        self.root_nodes = None
+        self.node_children = None
+        self.node_emb = None
+        self.node_left_coef = None
+        self.node_right_coef = None
+        self.target = None
 
     def assign(self, placeholders):
         pc = placeholders  # type: Placeholders
@@ -33,27 +33,29 @@ class Placeholders:
 
 def create_convolution(params):
     embeddings = params.embeddings
+    pc = Placeholders()
     with tf.name_scope('Placeholders'):
-        root_nodes = tf.placeholder(tf.int32, [None], 'node_indexes')
-        node_children = tf.placeholder(tf.int32, [None, None], 'node_children')
-        node_emb = tf.placeholder(tf.int32, [None], 'node_emb')
-        node_left_coef = tf.placeholder(tf.float32, [None], 'left_coef')
-        node_right_coef = tf.placeholder(tf.float32, [None], 'right_coef')
+        pc.root_nodes = tf.placeholder(tf.int32, [None], 'node_indexes')
+        pc.node_children = tf.placeholder(tf.int32, [None, None], 'node_children')
+        pc.node_emb = tf.placeholder(tf.int32, [None], 'node_emb')
+        pc.node_left_coef = tf.placeholder(tf.float32, [None], 'left_coef')
+        pc.node_right_coef = tf.placeholder(tf.float32, [None], 'right_coef')
+
     with tf.name_scope('Target'):
-        target = tf.placeholder(tf.int64, [1], 'target')
+        pc.target = tf.placeholder(tf.int64, [1], 'target')
 
     def loop_cond(_, i):
-        return tf.less(i, tf.squeeze(tf.shape(root_nodes)))
+        return tf.less(i, tf.squeeze(tf.shape(pc.root_nodes)))
 
     def convolve(pool, i):
-        root_emb = tf.gather(root_nodes, i)
-        root_ch_i = tf.gather(node_children, i)
-        children_emb_i = tf.gather(node_emb, root_ch_i)
+        root_emb = tf.gather(pc.root_nodes, i)
+        root_ch_i = tf.gather(pc.node_children, i)
+        children_emb_i = tf.gather(pc.node_emb, root_ch_i)
         root = tf.gather(embeddings, root_emb)
         root = tf.expand_dims(root, 0)
         children_emb = tf.gather(embeddings, children_emb_i)
-        children_l_coef = tf.gather(node_left_coef, root_ch_i)
-        children_r_coef = tf.gather(node_right_coef, root_ch_i)
+        children_l_coef = tf.gather(pc.node_left_coef, root_ch_i)
+        children_r_coef = tf.gather(pc.node_right_coef, root_ch_i)
         children_l_coef = tf.expand_dims(children_l_coef, 1)
         children_r_coef = tf.expand_dims(children_r_coef, 1)
 
@@ -84,7 +86,7 @@ def create_convolution(params):
         pooling, _ = tf.while_loop(loop_cond, convolve, [pooling, 0])
         convolution = tf.reduce_max(pooling.concat(), 0, keep_dims=True)
 
-    return convolution, Placeholders(root_nodes, node_children, node_emb, node_left_coef, node_right_coef, target)
+    return convolution, pc
 
 
 def create(params):

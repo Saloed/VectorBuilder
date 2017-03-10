@@ -34,20 +34,21 @@ def compute_rates(root_node: Token):
 
 
 def prepare_batch(ast: Nodes, emb_indexes, r_index):
-    target = [r_index[ast.root_node.author]]
+    pc = Placeholders()
+    pc.target = [r_index[ast.root_node.author]]
     nodes = ast.all_nodes
     compute_rates(ast.root_node)
     compute_leaf_num(ast.root_node, nodes)
     ast.non_leafs.sort(key=lambda x: x.index)
     ast.all_nodes.sort(key=lambda x: x.index)
-    root_nodes = [emb_indexes[node.token_type] for node in ast.non_leafs]
-    node_emb = [emb_indexes[node.token_type] for node in ast.all_nodes]
-    node_left_coef = [node.left_rate for node in ast.all_nodes]
-    node_right_coef = [node.right_rate for node in ast.all_nodes]
-    zero_node_index = len(node_emb)
-    node_emb.append(emb_indexes['ZERO_EMB'])
-    node_left_coef.append(0.0)
-    node_right_coef.append(0.0)
+    pc.root_nodes = [emb_indexes[node.token_type] for node in ast.non_leafs]
+    pc.node_emb = [emb_indexes[node.token_type] for node in ast.all_nodes]
+    pc.node_left_coef = [node.left_rate for node in ast.all_nodes]
+    pc.node_right_coef = [node.right_rate for node in ast.all_nodes]
+    zero_node_index = len(pc.node_emb)
+    pc.node_emb.append(emb_indexes['ZERO_EMB'])
+    pc.node_left_coef.append(0.0)
+    pc.node_right_coef.append(0.0)
     max_children_len = max([len(node.children) for node in ast.non_leafs])
 
     def align_nodes(nodes):
@@ -56,9 +57,9 @@ def prepare_batch(ast: Nodes, emb_indexes, r_index):
             result.append(zero_node_index)
         return result
 
-    node_children = [align_nodes(node.children) for node in ast.non_leafs]
+    pc.node_children = [align_nodes(node.children) for node in ast.non_leafs]
 
-    return Placeholders(root_nodes, node_children, node_emb, node_left_coef, node_right_coef, target)
+    return pc
 
 
 def generate_batches(data_set, emb_indexes, r_index, net):
