@@ -1,7 +1,7 @@
 import _pickle as P
 import numpy as np
 import tensorflow as tf
-from AST.Sampler import build_psi_text
+from AST.GitAuthor import build_psi_text
 from TFAuthorClassifier.TFParameters import NUM_FEATURES
 from Word2Vec import word2vec_optimized as word2vec
 from Word2Vec.word2vec_optimized import Word2Vec

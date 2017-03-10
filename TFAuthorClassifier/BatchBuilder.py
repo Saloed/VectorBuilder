@@ -4,22 +4,6 @@ from TFAuthorClassifier.NetBuilder import Placeholders
 from TFAuthorClassifier.TFParameters import BATCH_SIZE
 
 
-def compute_leaf_num(root, nodes, depth=0):
-    if root.is_leaf:
-        root.leaf_num = 1
-        root.children_num = 1
-        return 1, 1, depth  # leaf_num, children_num, depth
-    avg_depth = 0.0
-    for child in root.children:
-        leaf_num, children_num, child_avg_depth = compute_leaf_num(child, nodes, depth + 1)
-        root.leaf_num += leaf_num
-        root.children_num += children_num
-        avg_depth += child_avg_depth * leaf_num
-    avg_depth /= root.leaf_num
-    root.children_num += 1
-    return root.leaf_num, root.children_num, avg_depth
-
-
 def compute_rates(root_node: Token):
     if not root_node.is_leaf:
         len_children = len(root_node.children)
@@ -36,9 +20,7 @@ def compute_rates(root_node: Token):
 def prepare_batch(ast: Nodes, emb_indexes, r_index):
     pc = Placeholders()
     pc.target = [r_index[ast.root_node.author]]
-    nodes = ast.all_nodes
     compute_rates(ast.root_node)
-    compute_leaf_num(ast.root_node, nodes)
     ast.non_leafs.sort(key=lambda x: x.index)
     ast.all_nodes.sort(key=lambda x: x.index)
     pc.root_nodes = [emb_indexes[node.token_type] for node in ast.non_leafs]
@@ -58,7 +40,6 @@ def prepare_batch(ast: Nodes, emb_indexes, r_index):
         return result
 
     pc.node_children = [align_nodes(node.children) for node in ast.non_leafs]
-
     return pc
 
 

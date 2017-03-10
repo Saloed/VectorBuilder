@@ -2,6 +2,15 @@ import _pickle as P
 from collections import namedtuple
 from random import shuffle
 
+from AST.GitAuthor import get_repo_methods_with_authors
+
+
+def generate_author_file():
+    data_set = get_repo_methods_with_authors('../Dataset/CombinedProjects/MPS/')
+    # data_set = get_single_author_data('../Dataset/OneAuthorProjects/distributedlog/')
+    with open('../Dataset/CombinedProjects/author_file_MPS', 'wb') as f:
+        P.dump(data_set, f)
+
 
 def divide_data_set(data_set, train_units, valid_units, test_units):
     data_set = list(zip(*data_set.values()))
