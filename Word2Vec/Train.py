@@ -7,8 +7,8 @@ from Word2Vec import word2vec_optimized as word2vec
 from Word2Vec.word2vec_optimized import Word2Vec
 
 
-def make_train_file(dataset_dir):
-    build_psi_text(dataset_dir)
+def make_train_file(data_set_dir):
+    build_psi_text(data_set_dir)
 
 
 def main():
