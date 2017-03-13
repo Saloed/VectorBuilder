@@ -323,7 +323,7 @@ def main():
     train_set = generate_batches(dataset.train, emb_indexes, dataset.r_index, net)
     test_set = generate_batches(dataset.valid, emb_indexes, dataset.r_index, net)
     saver = tf.train.Saver()
-    for retry_num in range(5):
+    for retry_num in range(NUM_RETRY):
         plot_axes, plot = new_figure(retry_num, NUM_EPOCH, 2)
         config = tf.ConfigProto()
         config.graph_options.optimizer_options.global_jit_level = tf.OptimizerOptions.ON_1
