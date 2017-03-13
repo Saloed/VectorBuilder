@@ -28,7 +28,7 @@ def safe_run(f):
             print(exc.args)  # arguments stored in .args
             print(exc)
             print_tb(exc.__traceback__)
-            return None
+            ret = None
         return ret
 
     return wrap

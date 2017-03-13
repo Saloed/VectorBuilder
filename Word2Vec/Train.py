@@ -1,22 +1,14 @@
 import _pickle as P
-
 import numpy as np
 import tensorflow as tf
-from theano import shared
-
-from AST.Sampler import build_psi_text
+from AST.GitAuthor import build_psi_text
 from TFAuthorClassifier.TFParameters import NUM_FEATURES
-from Embeddings.Parameters import Parameters
 from Word2Vec import word2vec_optimized as word2vec
 from Word2Vec.word2vec_optimized import Word2Vec
 
 
-def make_train_file(dataset_dir):
-    build_psi_text(dataset_dir)
-
-
-def decode(word):
-    word.decode("utf8", errors='replace')
+def make_train_file(data_set_dir):
+    build_psi_text(data_set_dir)
 
 
 def main():
@@ -32,10 +24,9 @@ def main():
             model.train()
         model.saver.save(session, "end_model.ckpt")
         emb = model.w_in.eval(session)  # type: np.multiarray.ndarray
-        embeddings = {decode(word): shared(emb[i], decode(word)) for word, i in model.word2id.items()}
-        param = Parameters(None, None, None, embeddings)
+        embeddings = {word.decode("utf8", errors='replace'): emb[i] for word, i in model.word2id.items()}
         with open('embeddings_w2v_new', 'wb') as f:
-            P.dump(param, f)
+            P.dump(embeddings, f)
 
 
 if __name__ == '__main__':

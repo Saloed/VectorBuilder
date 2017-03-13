@@ -1,26 +1,19 @@
+import _pickle as P
+from collections import OrderedDict
+
+import numpy as np
+import tensorflow as tf
+
+LEARN_RATE = 0.07  # 0.001
+L2_PARAM = 5.e-5
 NUM_FEATURES = 100
-
-margin = 1
-learn_rate = 0.07  # 0.0001
-beta = .0001
-momentum = 0.1
-l2_param = 5.e-5
-clip_const = 1.e-2
-
 NUM_CONVOLUTION = 800  # 50
-NUM_DISCRIMINATIVE = 30  # 50
-NUM_OUT_LAYER = 10
-NUM_POOLING = 3
-
 NUM_HIDDEN = 80
 SAVE_PERIOD = 20
 BATCH_SIZE = 20
-
-TOKEN_THRESHOLD = 0
-
-RANDOM_RANGE = 0.02
-
 NUM_RETRY = 200
+TOKEN_THRESHOLD = 150
+RANDOM_RANGE = 0.02
 NUM_EPOCH = 50
 
 
@@ -44,3 +37,55 @@ class Params:
         }
 
         self.embeddings = embeddings
+
+
+def rand_weight(shape_0, shape_1, name):
+    with tf.name_scope(name):
+        var = tf.Variable(
+            tf.truncated_normal(shape=[shape_1, shape_0], stddev=RANDOM_RANGE),
+            name=name)
+        variable_summaries(var)
+    return var
+
+
+def rand_bias(shape, name):
+    return rand_weight(shape, 1, name)
+
+
+def init_params(author_amount):
+    with open('TFAuthorClassifier/embeddings', 'rb') as f:
+        np_embs = P.load(f)
+    with tf.name_scope('Embeddings'):
+        np_embs = OrderedDict(np_embs)
+        zero_emb = np.zeros([NUM_FEATURES], np.float32)
+        np_embs['ZERO_EMB'] = zero_emb
+        emb_indexes = {name: i for i, name in enumerate(np_embs.keys())}
+        embeddings = tf.stack(list(np_embs.values()))
+
+    with tf.name_scope('Params'):
+        w_conv_root = rand_weight(NUM_CONVOLUTION, NUM_FEATURES, 'w_conv_root')
+        w_conv_left = rand_weight(NUM_CONVOLUTION, NUM_FEATURES, 'w_conv_left')
+        w_conv_right = rand_weight(NUM_CONVOLUTION, NUM_FEATURES, 'w_conv_right')
+        w_hid = rand_weight(NUM_HIDDEN, NUM_CONVOLUTION, 'w_hid')
+        w_out = rand_weight(author_amount, NUM_HIDDEN, 'w_out')
+
+        b_conv = rand_bias(NUM_CONVOLUTION, 'b_conv')
+        b_hid = rand_bias(NUM_HIDDEN, 'b_hid')
+        b_out = rand_bias(author_amount, 'b_out')
+
+    return Params(w_conv_root, w_conv_left, w_conv_right,
+                  w_hid, w_out, b_conv, b_hid, b_out,
+                  embeddings), emb_indexes
+
+
+def variable_summaries(var):
+    """Attach a lot of summaries to a Tensor (for TensorBoard visualization)."""
+    with tf.name_scope('summaries'):
+        mean = tf.reduce_mean(var)
+        tf.summary.scalar('mean', mean)
+        with tf.name_scope('stddev'):
+            stddev = tf.sqrt(tf.reduce_mean(tf.square(var - mean)))
+        tf.summary.scalar('stddev', stddev)
+        tf.summary.scalar('max', tf.reduce_max(var))
+        tf.summary.scalar('min', tf.reduce_min(var))
+        tf.summary.histogram('histogram', var)

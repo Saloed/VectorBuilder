@@ -2,16 +2,17 @@ from git import *
 from os import walk
 from collections import Counter, namedtuple
 import _pickle as P
-from AST.Tokenizer import parser_init, build_ast, print_ast, divide_by_methods, Nodes
+from AST.Tokenizer import *
+from AST.Tokenizer import parser_init, get_psi_text
 
 MAGIC_CONST = 0.68
 
 DataSet = namedtuple('DataSet', ['methods_with_authors', 'all_authors'])
 
 
-def parse_directory(dir, f: list):
-    for (dirpath, dirnames, filenames) in walk(dir):
-        full_file_names = [dirpath + '/' + filename for filename in filenames if
+def parse_directory(directory, f: list):
+    for (dir_path, dir_names, file_names) in walk(directory):
+        full_file_names = [dir_path + '/' + filename for filename in file_names if
                            filename.endswith('.java')]
         f.extend(full_file_names)
     return f
@@ -82,6 +83,26 @@ def get_repo_methods_with_authors(repo_path) -> DataSet:
         if author not in all_authors:
             all_authors.append(author)
     return DataSet(methods_with_authors, all_authors)
+
+
+def build_psi_text(data_set_dir):
+    parser = parser_init()
+    files = parse_directory(data_set_dir, [])
+    psi_text_file = []
+    for file in files:
+        try:
+            print(file)
+            psi_text = get_psi_text(file, parser)
+            psi_text_file.append(psi_text)
+        except Exception as ex:
+            print(ex)
+            continue
+    print('end ast building')
+    delimiter = 'WHITE_SPACE ' * 5 + '\n'
+    text = delimiter.join(psi_text_file)
+
+    with open('/home/sobol/PycharmProjects/VectorBuilder/Dataset/psi_text_1.data', 'w') as text_file:
+        text_file.write(text)
 
 
 if __name__ == '__main__':
