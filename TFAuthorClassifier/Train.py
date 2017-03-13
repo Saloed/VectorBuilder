@@ -38,7 +38,8 @@ def main():
     train_set = generate_batches(data_set.train, emb_indexes, data_set.r_index, net)
     test_set = generate_batches(data_set.valid, emb_indexes, data_set.r_index, net)
     saver = tf.train.Saver()
-    for retry_num in range(5):
+    for retry_num in range(NUM_RETRY):
+        save_path = 'TFAuthorClassifier/Params/Retry_{}/'.format(retry_num)
         plot_axes, plot = new_figure(retry_num, NUM_EPOCH, 2)
         config = tf.ConfigProto()
         config.graph_options.optimizer_options.global_jit_level = tf.OptimizerOptions.ON_1
@@ -63,11 +64,11 @@ def main():
                 logging.info('\n'.join(print_str))
                 # if train_epoch % SAVE_PERIOD == 0:
                 if True:
-                    saver.save(sess, 'TFAuthorClassifier/NewParams/model', retry_num * 10000 + train_epoch)
+                    saver.save(sess, save_path + 'model', train_epoch)
                 update_figure(plot, plot_axes, train_epoch, te_loss, tr_loss)
                 info = sess.run(fetches=summaries)
                 summary_writer.add_summary(info, train_epoch)
-        save_to_file(plot, 'retry{}.png'.format(retry_num))
+        save_to_file(plot, save_path + 'error.png'.format(retry_num))
         summary_writer.close()
 
 
