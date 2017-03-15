@@ -6,9 +6,9 @@ from AST.GitAuthor import get_repo_methods_with_authors
 
 
 def generate_author_file():
-    data_set = get_repo_methods_with_authors('../Dataset/CombinedProjects/MPS/')
+    data_set = get_repo_methods_with_authors('../Dataset/intellij-community/')
     # data_set = get_single_author_data('../Dataset/OneAuthorProjects/distributedlog/')
-    with open('../Dataset/CombinedProjects/author_file_MPS', 'wb') as f:
+    with open('../Dataset/author_file_intellij', 'wb') as f:
         P.dump(data_set, f)
 
 
@@ -50,4 +50,5 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    # main()
+    generate_author_file()

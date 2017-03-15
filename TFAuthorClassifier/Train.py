@@ -1,4 +1,6 @@
 import _pickle as P
+import datetime
+import os
 import logging
 import sys
 from random import shuffle
@@ -37,39 +39,45 @@ def main():
     updates, net, summaries = build_net(params)
     train_set = generate_batches(data_set.train, emb_indexes, data_set.r_index, net)
     test_set = generate_batches(data_set.valid, emb_indexes, data_set.r_index, net)
-    saver = tf.train.Saver()
+    current_date = datetime.datetime.now()
+    current_date = '{}_{}_{}'.format(current_date.day, current_date.month, current_date.year)
     for retry_num in range(NUM_RETRY):
-        save_path = 'TFAuthorClassifier/Params/Retry_{}/'.format(retry_num)
+        saver = tf.train.Saver(max_to_keep=NUM_EPOCH)
+        save_path = 'Results/tf_adam_{}/Retry_{}/'.format(current_date, retry_num)
+        if not os.path.exists(save_path):
+            os.makedirs(save_path)
         plot_axes, plot = new_figure(retry_num, NUM_EPOCH, 2)
         config = tf.ConfigProto()
         config.graph_options.optimizer_options.global_jit_level = tf.OptimizerOptions.ON_1
         with tf.Session(config=config) as sess, tf.device('/cpu:0'):
-            summary_writer = tf.summary.FileWriter('TFAuthorClassifier/Summary', sess.graph)
+            summary_writer = tf.summary.FileWriter(save_path + 'Summary', sess.graph)
             sess.run(tf.global_variables_initializer())
-            for train_epoch in range(NUM_EPOCH):
-                shuffle(train_set)
-                tr_loss, tr_max, tr_err = process_set(train_set, [net.loss, net.max_loss, net.error, updates], True,
-                                                      sess)
-                te_loss, te_max, te_err = process_set(test_set, [net.loss, net.max_loss, net.error], False, sess)
-                print_str = [
-                    'epoch {0} retry {1}'.format(train_epoch, retry_num),
-                    'train | mean {0:.4f} | max {1:.4f} | percent {2:.2f}'.format(float(tr_loss),
-                                                                                  float(tr_max),
-                                                                                  float(tr_err)),
-                    'test  | mean {0:.4f} | max {1:.4f} | percent {2:.2f}'.format(float(te_loss),
-                                                                                  float(te_max),
-                                                                                  float(te_err)),
-                    '################'
-                ]
-                logging.info('\n'.join(print_str))
-                # if train_epoch % SAVE_PERIOD == 0:
-                if True:
-                    saver.save(sess, save_path + 'model', train_epoch)
-                update_figure(plot, plot_axes, train_epoch, te_loss, tr_loss)
-                info = sess.run(fetches=summaries)
-                summary_writer.add_summary(info, train_epoch)
-        save_to_file(plot, save_path + 'error.png'.format(retry_num))
-        summary_writer.close()
+            try:
+                for train_epoch in range(NUM_EPOCH):
+                    shuffle(train_set)
+                    tr_loss, tr_max, tr_err = process_set(train_set, [net.loss, net.max_loss, net.error, updates], True,
+                                                          sess)
+                    te_loss, te_max, te_err = process_set(test_set, [net.loss, net.max_loss, net.error], False, sess)
+                    print_str = [
+                        'epoch {0} retry {1}'.format(train_epoch, retry_num),
+                        'train | mean {0:.4f} | max {1:.4f} | percent {2:.2f}'.format(float(tr_loss),
+                                                                                      float(tr_max),
+                                                                                      float(tr_err)),
+                        'test  | mean {0:.4f} | max {1:.4f} | percent {2:.2f}'.format(float(te_loss),
+                                                                                      float(te_max),
+                                                                                      float(te_err)),
+                        '################'
+                    ]
+                    logging.info('\n'.join(print_str))
+                    # if train_epoch % SAVE_PERIOD == 0:
+                    if True:
+                        saver.save(sess, save_path + 'model', train_epoch)
+                    update_figure(plot, plot_axes, train_epoch, te_loss, tr_loss)
+                    info = sess.run(fetches=summaries)
+                    summary_writer.add_summary(info, train_epoch)
+            finally:
+                save_to_file(plot, save_path + 'error.png'.format(retry_num))
+                summary_writer.close()
 
 
 if __name__ == '__main__':

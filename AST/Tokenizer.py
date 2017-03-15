@@ -1,16 +1,42 @@
+import os
 from collections import namedtuple
 import pydot
-from py4j.java_gateway import JavaGateway, get_field
+import subprocess
+
+import time
+
+import sys
+from py4j.java_gateway import JavaGateway, get_field, GatewayParameters
 
 from AST.Token import Token
 
 Nodes = namedtuple('Nodes', ['root_node', 'all_nodes', 'non_leafs'])
 
 
-def parser_init():
-    gateway = JavaGateway()
+class Author:
+    def __init__(self, name, email):
+        self.name = name
+        self.email = email
+
+    def __eq__(self, other):
+        return self.name == other.name or self.email == other.email
+
+    def __str__(self):
+        return '{} <{}>'.format(self.name, self.email)
+
+    def __repr__(self):
+        return '{} <{}>'.format(self.name, self.email)
+
+
+def parser_init(port):
+    process = subprocess.Popen(
+        ["java", "-jar", "/home/sobol/PycharmProjects/VectorBuilder/AST/PsiGenerator.jar", str(port)],
+        stdout=sys.stdout, stderr=sys.stderr)
+    time.sleep(1)
+    parameters = GatewayParameters(port=port)
+    gateway = JavaGateway(gateway_parameters=parameters)
     parser = gateway.entry_point.getParser()
-    return parser
+    return parser, gateway, process
 
 
 def tree_to_list(tree_root_token: Token) -> list:
@@ -116,11 +142,10 @@ def visualize(ast_root_node, filename):
     _create_graph(ast_root_node, graph)
     graph.write_png(filename)
 
-
-if __name__ == '__main__':
-    parser = parser_init()
-    tokens = get_all_available_tokens(parser)
-    print(tokens)
-    test_filename = '../Dataset/java_files/LayoutEngine.java'
-    ast = build_ast(test_filename, parser)
-    print_ast(ast.root_node)
+# if __name__ == '__main__':
+#     parser = parser_init()
+#     tokens = get_all_available_tokens(parser)
+#     print(tokens)
+#     test_filename = '../Dataset/java_files/LayoutEngine.java'
+#     ast = build_ast(test_filename, parser)
+#     print_ast(ast.root_node)

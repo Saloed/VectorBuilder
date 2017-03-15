@@ -1,5 +1,5 @@
 class Token:
-    def __init__(self, token_type, parent, is_leaf, pos=0, start_line=None, end_line=None):
+    def __init__(self, token_type, parent, is_leaf, pos=0, start_line=None, end_line=None, author=None):
         self.token_type = token_type
         self.parent = parent
         self.children = []
@@ -12,7 +12,7 @@ class Token:
         self.index = None
         self.start_line = start_line
         self.end_line = end_line
-        self.author = None
+        self.author = author
 
     def __str__(self):
         return str(self.token_type) + '_' + str(self.index)

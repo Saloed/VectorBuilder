@@ -1,3 +1,5 @@
+from multiprocessing.pool import Pool
+import logging
 from git import *
 from os import walk
 from collections import Counter, namedtuple
@@ -61,14 +63,12 @@ def get_single_author_data(repo_path):
     return DataSet([d for d in data.methods_with_authors if d.root_node.author == author], [author])
 
 
-def get_repo_methods_with_authors(repo_path) -> DataSet:
-    parser = parser_init()
-    repo = Repo(repo_path)
-    files = parse_directory(repo_path, [])
+def _process_files(repo, files, _parser):
+    parser, gateway, process = _parser
     methods_with_authors = []
     for i, file in enumerate(files):
-        file_in_repo = file.replace(repo_path, "")
-        print(file_in_repo + ' {}/{}'.format(i, len(files)))
+        file_in_repo, file = file
+        logging.info(file_in_repo + ' {}/{}'.format(i, len(files)))
         blames = repo.blame_incremental('HEAD', file_in_repo)
         authors = {}
         for blame in blames:
@@ -77,6 +77,26 @@ def get_repo_methods_with_authors(repo_path) -> DataSet:
             for l in lines:
                 authors[l] = author
         methods_with_authors.extend(_associate_authors(file, authors, parser))
+    gateway.shutdown()
+    process.terminate()
+    return methods_with_authors
+
+
+def get_repo_methods_with_authors(repo_path) -> DataSet:
+    logging.basicConfig(level=logging.INFO)
+    repo = Repo(repo_path)
+    files = parse_directory(repo_path, [])
+    pool_size = 8
+    chunk_size = len(files) // pool_size
+    base_port_address = 25347
+    parsers = [parser_init(base_port_address + i) for i in range(pool_size)]
+    files = [(file.replace(repo_path, ""), file) for file in files]
+    files = [files[i:i + chunk_size] for i in range(0, len(files), chunk_size)]
+    pool = Pool(pool_size)
+    results = [pool.apply_async(_process_files, (repo, files[i], parsers[i])) for i in range(pool_size)]
+    methods_with_authors = []
+    for res in results:
+        methods_with_authors.extend(res.get())
     all_authors = []
     for met in methods_with_authors:
         author = met.root_node.author
@@ -86,7 +106,7 @@ def get_repo_methods_with_authors(repo_path) -> DataSet:
 
 
 def build_psi_text(data_set_dir):
-    parser = parser_init()
+    parser, gateway, process = parser_init(25537)
     files = parse_directory(data_set_dir, [])
     psi_text_file = []
     for file in files:
@@ -100,7 +120,8 @@ def build_psi_text(data_set_dir):
     print('end ast building')
     delimiter = 'WHITE_SPACE ' * 5 + '\n'
     text = delimiter.join(psi_text_file)
-
+    gateway.shutdown()
+    process.terminate()
     with open('/home/sobol/PycharmProjects/VectorBuilder/Dataset/psi_text_1.data', 'w') as text_file:
         text_file.write(text)
 

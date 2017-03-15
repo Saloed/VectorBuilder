@@ -4,12 +4,14 @@ from TFAuthorClassifier.TFParameters import NUM_CONVOLUTION, BATCH_SIZE, L2_PARA
 
 
 class Net:
-    def __init__(self, out, loss, error, max_loss, pc):
+    def __init__(self, out, loss, error, max_loss, result, target, pc):
         self.out = out
         self.loss = loss
         self.error = error
         self.max_loss = max_loss
         self.placeholders = pc
+        self.result = result
+        self.target = target
 
 
 class Placeholders:
@@ -106,13 +108,14 @@ def create(params):
     with tf.name_scope('Out'):
         logits = tf.matmul(hid_layer, params.w['w_out'] + params.b['b_out'])
         out = tf.nn.softmax(logits)
+        result = tf.argmax(out, 1)
     with tf.name_scope('Error'):
         loss = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits, labels=target)
-        error = tf.cast(tf.not_equal(tf.argmax(out, 1), target), tf.float32)
+        error = tf.cast(tf.not_equal(result, target), tf.float32)
         loss = tf.reduce_mean(loss)
         error = tf.reduce_mean(error)
         max_loss = tf.reduce_max(loss)
-    return Net(out, loss, error, max_loss, placeholders)
+    return Net(out, loss, error, max_loss, result, target, placeholders)
 
 
 def build_net(params):
