@@ -12,7 +12,7 @@ def analyzer_init(port=None):
     if port is None:
         port = 25537
     process = subprocess.Popen(
-        ["java", "-jar", "/home/sobol/PycharmProjects/VectorBuilder/AST/AuthorAnalyzer.jar", str(port)],
+        ["java", "-jar", "AST/AuthorAnalyzer.jar", str(port)],
         stdout=sys.stdout, stderr=sys.stderr)
     time.sleep(1)
     parameters = GatewayParameters(port=port)
@@ -33,7 +33,7 @@ def process_ast(ast):
 
 
 if __name__ == '__main__':
-    repo_path = "Dataset/OneAuthorProjects/distributedlog/"
+    repo_path = "Dataset/intellij-community/"
     analyzer, gateway, process = analyzer_init()
     analyzer_data = analyzer.analyzeRepo(repo_path)
     print('End data generation')
@@ -43,7 +43,7 @@ if __name__ == '__main__':
             d = process_ast(ast)
             data.append(d)
         print('Constructed {} / {}'.format(i, len(analyzer_data)))
-    with open('Dataset/OneAuthorProjects/distributedlog_file', 'wb') as f:
+    with open('Dataset/intellij_file', 'wb') as f:
         P.dump(data, f)
     gateway.shutdown()
     process.terminate()
