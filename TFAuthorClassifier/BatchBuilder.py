@@ -43,14 +43,14 @@ def prepare_batch(ast: Nodes, emb_indexes, r_index):
     return pc
 
 
-def generate_batches(data_set, emb_indexes, r_index, net):
+def generate_batches(data_set, emb_indexes, r_index, net, dropout):
     size = len(data_set) // BATCH_SIZE
     pc = net.placeholders
     batches = []
     for j in range(size):
         ind = j * BATCH_SIZE
         d = data_set[ind:ind + BATCH_SIZE]
-        feed = {}
+        feed = {net.dropout: dropout}
         for i in range(BATCH_SIZE):
             feed.update(pc[i].assign(prepare_batch(d[i], emb_indexes, r_index)))
         batches.append(feed)

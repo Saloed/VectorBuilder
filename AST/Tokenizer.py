@@ -21,6 +21,9 @@ class Author:
     def __eq__(self, other):
         return self.name == other.name or self.email == other.email
 
+    def __hash__(self):
+        return 17 * hash(self.name) + 31 * hash(self.email)
+
     def __str__(self):
         return '{} <{}>'.format(self.name, self.email)
 

@@ -32,18 +32,18 @@ def process_set(batches, fun, is_train, session):
 def main():
     logging.basicConfig(filename='log.txt', level=logging.INFO)
     logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
-    with open('Dataset/CombinedProjects/top_authors_MPS_data', 'rb') as f:
+    with open('Dataset/intellij_data_set', 'rb') as f:
         # with open('TFAuthorClassifier/test_data_data', 'rb') as f:
         data_set = P.load(f)  # type: DataSet
     params, emb_indexes = init_params(data_set.amount)
     updates, net, summaries = build_net(params)
-    train_set = generate_batches(data_set.train, emb_indexes, data_set.r_index, net)
-    test_set = generate_batches(data_set.valid, emb_indexes, data_set.r_index, net)
+    train_set = generate_batches(data_set.train, emb_indexes, data_set.r_index, net, 0.7)
+    test_set = generate_batches(data_set.valid, emb_indexes, data_set.r_index, net, 1.0)
     current_date = datetime.datetime.now()
     current_date = '{}_{}_{}'.format(current_date.day, current_date.month, current_date.year)
     for retry_num in range(NUM_RETRY):
         saver = tf.train.Saver(max_to_keep=NUM_EPOCH)
-        save_path = 'Results/tf_adam_{}/Retry_{}/'.format(current_date, retry_num)
+        save_path = 'Results/idea_tf_adam_{}/Retry_{}/'.format(current_date, retry_num)
         if not os.path.exists(save_path):
             os.makedirs(save_path)
         plot_axes, plot = new_figure(retry_num, NUM_EPOCH, 2)

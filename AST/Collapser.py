@@ -8,7 +8,10 @@ def collapse(filename):
     with open(filename, 'rb') as f:
         dataset = P.load(f)
         authors = dataset.all_authors
-    authors = [Author(a) for a in authors]
+    return author_collapse(authors)
+
+
+def author_collapse(authors):
     acopy = deepcopy(authors)
     uauthors = []
 
@@ -25,4 +28,4 @@ def collapse(filename):
                     change = True
             acopy = [a for a in acopy if a is not None]
         uauthors.append(tmp)
-    return authors
+    return uauthors

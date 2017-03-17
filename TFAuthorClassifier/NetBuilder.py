@@ -4,12 +4,13 @@ from TFAuthorClassifier.TFParameters import NUM_CONVOLUTION, BATCH_SIZE, L2_PARA
 
 
 class Net:
-    def __init__(self, out, loss, error, max_loss, result, target, pc):
+    def __init__(self, out, loss, error, max_loss, result, target, pc, dropout):
         self.out = out
         self.loss = loss
         self.error = error
         self.max_loss = max_loss
         self.placeholders = pc
+        self.dropout = dropout
         self.result = result
         self.target = target
 
@@ -104,7 +105,9 @@ def create(params):
         convolution = tf.concat(convolutions, axis=0, name='convolution')
     target = tf.concat(targets, axis=0, name='target')
     with tf.name_scope('Hidden'):
-        hid_layer = tf.nn.sigmoid(tf.matmul(convolution, params.w['w_hid']) + params.b['b_hid'])
+        hid_layer = tf.nn.relu(tf.matmul(convolution, params.w['w_hid']) + params.b['b_hid'])
+        dropout_prob = tf.placeholder(tf.float32)
+        hid_layer = tf.nn.dropout(hid_layer, dropout_prob)
     with tf.name_scope('Out'):
         logits = tf.matmul(hid_layer, params.w['w_out'] + params.b['b_out'])
         out = tf.nn.softmax(logits)
@@ -115,7 +118,7 @@ def create(params):
         loss = tf.reduce_mean(loss)
         error = tf.reduce_mean(error)
         max_loss = tf.reduce_max(loss)
-    return Net(out, loss, error, max_loss, result, target, placeholders)
+    return Net(out, loss, error, max_loss, result, target, placeholders, dropout_prob)
 
 
 def build_net(params):

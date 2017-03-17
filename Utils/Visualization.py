@@ -7,7 +7,7 @@ def new_figure(num, epoch_in_retry, max_y):
     yv = np.full(epoch_in_retry, -1.1)
     yt = np.full(epoch_in_retry, -1.1)
     fig = plotter.figure(num)
-    fig.set_size_inches(1920, 1080)
+    fig.set_size_inches(10, 10)
     ax = fig.add_subplot(1, 1, 1)
     ax.set_xlim(0, epoch_in_retry)
     ax.set_ylim(0, max_y)

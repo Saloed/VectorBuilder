@@ -34,21 +34,29 @@ DataSet = namedtuple('DataSet', ['test', 'valid', 'train', 'r_index', 'amount'])
 
 
 def main():
-    with open('Dataset/CombinedProjects/top_authors_MPS', 'rb') as f:
+    with open('Dataset/intellij_data', 'rb') as f:
         # with open('TFAuthorClassifier/test_data', 'rb') as f:
         dataset = P.load(f)
     dataset = dataset[:5]
     indexes = range(len(dataset))
     authors = [(i, dataset[i][1]) for i in indexes]
     authors_amount, r_index = build_vectors(authors)
-    batches = {i: dataset[i][0] for i in indexes}
-    train_set, valid_set, test_set = divide_data_set(batches, 800, 200, 600)
+
+    # fixme: Smth strange (this token not in all_tokens but appear)
+    def check_for_error(method):
+        for token in method.all_nodes:
+            if token.token_type == 'ERROR_ELEMENT':
+                return False
+        return True
+
+    batches = {i: [m for m in dataset[i][0] if check_for_error(m)] for i in indexes}
+    train_set, valid_set, test_set = divide_data_set(batches, 900, 200, 700)
     dataset = DataSet(test_set, valid_set, train_set, r_index, authors_amount)
-    with open('Dataset/CombinedProjects/top_authors_MPS_data', 'wb') as f:
+    with open('Dataset/intellij_data_set', 'wb') as f:
         # with open('TFAuthorClassifier/test_data_data', 'wb') as f:
         P.dump(dataset, f)
 
 
 if __name__ == '__main__':
-    # main()
-    generate_author_file()
+    main()
+    # generate_author_file()
