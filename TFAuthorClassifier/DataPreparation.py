@@ -33,14 +33,10 @@ def build_vectors(authors):
 DataSet = namedtuple('DataSet', ['test', 'valid', 'train', 'r_index', 'amount'])
 
 
-def main():
-    with open('Dataset/intellij_data', 'rb') as f:
-        # with open('TFAuthorClassifier/test_data', 'rb') as f:
-        dataset = P.load(f)
-    dataset = dataset[:5]
-    indexes = range(len(dataset))
-    authors = [(i, dataset[i][1]) for i in indexes]
-    authors_amount, r_index = build_vectors(authors)
+def make_data_file(filename, min_tokens, max_child_tokens):
+    with open(filename, 'rb') as f:
+        data_set = P.load(f)
+    data_set = list(data_set)
 
     # fixme: Smth strange (this token not in all_tokens but appear)
     def check_for_error(method):
@@ -49,10 +45,42 @@ def main():
                 return False
         return True
 
-    batches = {i: [m for m in dataset[i][0] if check_for_error(m)] for i in indexes}
-    train_set, valid_set, test_set = divide_data_set(batches, 900, 200, 700)
+    def check_max_len(method, max_len):
+        def process_node(node):
+            result = len(node.children) < max_len
+            for child in node.children:
+                if result:
+                    result = process_node(child)
+            return result
+
+        return process_node(method.root_node)
+
+    new_data_set = [
+        ([m for m in methods if len(m.all_nodes) > min_tokens
+          and check_for_error(m)
+          and check_max_len(m, max_child_tokens)], author)
+        for methods, author in data_set]
+
+    new_data_set.sort(key=lambda x: len(x[0]), reverse=True)
+
+    with open(filename + '_{}_{}'.format(min_tokens, max_child_tokens), 'wb') as f:
+        P.dump(new_data_set, f)
+
+    return new_data_set
+
+
+def main():
+    with open('Dataset/intellij_data_100_100', 'rb') as f:
+        # with open('TFAuthorClassifier/test_data', 'rb') as f:
+        dataset = P.load(f)
+    dataset = dataset[:5]
+    indexes = range(len(dataset))
+    authors = [(i, dataset[i][1]) for i in indexes]
+    authors_amount, r_index = build_vectors(authors)
+    batches = {i: dataset[i][0] for i in indexes}
+    train_set, valid_set, test_set = divide_data_set(batches, 1800, 200, 700)
     dataset = DataSet(test_set, valid_set, train_set, r_index, authors_amount)
-    with open('Dataset/intellij_data_set', 'wb') as f:
+    with open('Dataset/intellij_data_set_100_100', 'wb') as f:
         # with open('TFAuthorClassifier/test_data_data', 'wb') as f:
         P.dump(dataset, f)
 
