@@ -35,8 +35,12 @@ def main():
         data_set = P.load(f)  # type: DataSet
     params, emb_indexes = init_params(data_set.amount)
     updates, net, summaries = build_net(params)
-    train_set = generate_batches(data_set.train, emb_indexes, data_set.r_index, net, DROPOUT)
-    test_set = generate_batches(data_set.valid, emb_indexes, data_set.r_index, net, 1.0)
+
+    # fixme : 100
+    train_set = generate_batches(data_set.train[:100], emb_indexes, data_set.r_index, net, DROPOUT)
+    test_set = generate_batches(data_set.valid[:100], emb_indexes, data_set.r_index, net, 1.0)
+
+
     current_date = datetime.datetime.now()
     current_date = '{}_{}_{}'.format(current_date.day, current_date.month, current_date.year)
     base_path = 'Results/idea_100_test_adam_{}/'.format(current_date)

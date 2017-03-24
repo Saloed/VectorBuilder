@@ -6,7 +6,7 @@ import tensorflow as tf
 
 LEARN_RATE = 0.07  # 0.001
 L2_PARAM = 5.e-5
-DROPOUT = 0.5
+DROPOUT = 0.7
 NUM_FEATURES = 100
 NUM_CONVOLUTION = 400
 NUM_HIDDEN = 40
@@ -52,8 +52,9 @@ def init_params(author_amount):
     with tf.name_scope('Params'):
         weights = {}
         rand_weight(NUM_CONVOLUTION, NUM_FEATURES, 'w_conv_root', weights)
-        rand_weight(NUM_CONVOLUTION, NUM_FEATURES, 'w_conv_left', weights)
-        rand_weight(NUM_CONVOLUTION, NUM_FEATURES, 'w_conv_right', weights)
+        rand_weight(NUM_CONVOLUTION, NUM_CONVOLUTION, 'w_conv_left', weights)
+        rand_weight(NUM_CONVOLUTION, NUM_CONVOLUTION, 'w_conv_right', weights)
+        rand_weight(NUM_CONVOLUTION, NUM_FEATURES, 'w_conv_emb', weights)
         rand_weight(NUM_HIDDEN, NUM_CONVOLUTION, 'w_hid', weights)
         rand_weight(author_amount, NUM_HIDDEN, 'w_out', weights)
         bias = {}

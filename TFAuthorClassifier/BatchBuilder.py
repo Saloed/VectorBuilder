@@ -17,16 +17,40 @@ def compute_rates(root_node: Token):
             compute_rates(child)
 
 
+def compute_indexes(root_node: Token):
+    index = 0
+    root_node.index = index
+    queue = [root_node]
+
+    while len(queue) > 0:
+        node = queue[0]
+        del queue[0]
+        for child in node.children:
+            index += 1
+            child.index = index
+        for child in node.children:
+            queue.append(child)
+
+
+def _make_list(fun, iterable):
+    size = len(iterable)
+    l = [None] * size
+    for itm in iterable:
+        l[itm.index] = fun(itm)
+    return l
+
+
 def prepare_batch(ast: Nodes, emb_indexes, r_index):
     pc = Placeholders()
     pc.target = [r_index[ast.root_node.author]]
+    compute_indexes(ast.root_node)
     compute_rates(ast.root_node)
-    ast.non_leafs.sort(key=lambda x: x.index)
-    ast.all_nodes.sort(key=lambda x: x.index)
-    pc.root_nodes = [emb_indexes[node.token_type] for node in ast.non_leafs]
-    pc.node_emb = [emb_indexes[node.token_type] for node in ast.all_nodes]
-    pc.node_left_c = [node.left_rate for node in ast.all_nodes]
-    pc.node_right_c = [node.right_rate for node in ast.all_nodes]
+    ast.non_leafs.sort(key=lambda x: x.index, reverse=True)
+    ast.all_nodes.sort(key=lambda x: x.index, reverse=True)
+    pc.node_emb = _make_list(lambda itm: emb_indexes[itm.token_type], ast.all_nodes)
+    pc.node_left_c = _make_list(lambda itm: itm.left_rate, ast.all_nodes)
+    pc.node_right_c = _make_list(lambda itm: itm.right_rate, ast.all_nodes)
+
     zero_node_index = len(pc.node_emb)
     pc.node_emb.append(emb_indexes['ZERO_EMB'])
     pc.node_left_c.append(0.0)
@@ -40,6 +64,10 @@ def prepare_batch(ast: Nodes, emb_indexes, r_index):
         return result
 
     pc.node_children = [align_nodes(node.children) for node in ast.non_leafs]
+    pc.nodes = [node.index for node in ast.non_leafs]
+    pc.zero_conv_index = len(ast.non_leafs)
+    pc.node_conv = _make_list(lambda node: pc.zero_conv_index if node.is_leaf else node.index, ast.all_nodes)
+    pc.length = len(ast.non_leafs)
     return pc
 
 
