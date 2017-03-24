@@ -63,11 +63,11 @@ def create_convolution(params):
         convolution = tf.TensorArray(
             dtype=tf.float32,
             size=pc.length + 1,
-            dynamic_size=True,
+            dynamic_size=False,
             clear_after_read=False,
             element_shape=[1, NUM_CONVOLUTION]
         )
-        convolution.write(pc.zero_conv_index, tf.zeros([1, NUM_CONVOLUTION], tf.float32))
+        convolution = convolution.write(pc.zero_conv_index, tf.zeros([1, NUM_CONVOLUTION], tf.float32))
 
         def convolve_subtree(_convolution, i):
             with tf.name_scope('SubtreeConvolution'):
@@ -101,51 +101,12 @@ def create_convolution(params):
                 z = tf.reduce_sum(z, 0)
                 z = tf.add(z, params.b['b_conv'])
                 conv = tf.nn.relu(z)
-                _convolution.write(node_conv_index, conv)
-            return _convolution, i + 1
+                _convolution = _convolution.write(node_conv_index, conv)
+            return _convolution, tf.add(i, 1)
 
-        tf.while_loop(loop_cond, convolve_subtree, [convolution, 0])
+        convolution, _ = tf.while_loop(loop_cond, convolve_subtree, [convolution, 0], parallel_iterations=1)
         return convolution.read(0), pc
-        # def convolve(pool, i):
-        #     root_emb = tf.gather(pc.root_nodes, i)
-        #     root_ch_i = tf.gather(pc.node_children, i)
-        #     children_emb_i = tf.gather(pc.node_emb, root_ch_i)
-        #     root = tf.gather(embeddings, root_emb)
-        #     root = tf.expand_dims(root, 0)
-        #     children_emb = tf.gather(embeddings, children_emb_i)
-        #     children_l_c = tf.gather(pc.node_left_c, root_ch_i)
-        #     children_r_c = tf.gather(pc.node_right_c, root_ch_i)
-        #     children_l_c = tf.expand_dims(children_l_c, 1)
-        #     children_r_c = tf.expand_dims(children_r_c, 1)
-        #
-        #     root = tf.matmul(root, params.w['w_conv_root'])
-        #
-        #     left_ch = tf.matmul(children_emb, params.w['w_conv_left'])
-        #     right_ch = tf.matmul(children_emb, params.w['w_conv_right'])
-        #
-        #     left_ch = tf.multiply(left_ch, children_l_c)
-        #     right_ch = tf.multiply(right_ch, children_r_c)
-        #
-        #     z = tf.concat([left_ch, right_ch, root], 0)
-        #     z = tf.reduce_sum(z, 0)
-        #     z = tf.add(z, params.b['b_conv'])
-        #     conv = tf.nn.relu(z)
-        #
-        #     pool = pool.write(i, conv)
-        #     i = tf.add(i, 1)
-        #     return pool, i
-        #
-        # with tf.name_scope('Pooling'):
-        #     pooling = tf.TensorArray(
-        #         tf.float32,
-        #         size=0,
-        #         dynamic_size=True,
-        #         clear_after_read=False,
-        #         element_shape=[1, NUM_CONVOLUTION])
-        #     pooling, _ = tf.while_loop(loop_cond, convolve, [pooling, 0])
-        #     convolution = tf.reduce_max(pooling.concat(), 0, keep_dims=True)
 
-        # return convolution, pc
 
 
 def create(params):

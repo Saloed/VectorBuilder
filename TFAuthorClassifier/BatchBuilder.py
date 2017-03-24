@@ -18,18 +18,23 @@ def compute_rates(root_node: Token):
 
 
 def compute_indexes(root_node: Token):
-    index = 0
-    root_node.index = index
-    queue = [root_node]
+    def _indexing_tree(_root_node, start_index, criteria):
+        index = start_index
+        queue = [_root_node]
+        while len(queue) > 0:
+            node = queue[0]
+            del queue[0]
+            for child in node.children:
+                if criteria(child):
+                    index += 1
+                    child.index = index
+            for child in node.children:
+                queue.append(child)
+        return index
 
-    while len(queue) > 0:
-        node = queue[0]
-        del queue[0]
-        for child in node.children:
-            index += 1
-            child.index = index
-        for child in node.children:
-            queue.append(child)
+    root_node.index = 0
+    new_index = _indexing_tree(root_node, 0, lambda node: not node.is_leaf)
+    _indexing_tree(root_node, new_index, lambda node: node.is_leaf)
 
 
 def _make_list(fun, iterable):
@@ -47,20 +52,23 @@ def prepare_batch(ast: Nodes, emb_indexes, r_index):
     compute_rates(ast.root_node)
     ast.non_leafs.sort(key=lambda x: x.index, reverse=True)
     ast.all_nodes.sort(key=lambda x: x.index, reverse=True)
+
+    zero_token = Token('ZERO_EMB', None, True)
+    zero_token.index = len(ast.all_nodes)
+    zero_token.left_rate = 0.0
+    zero_token.right_rate = 0.0
+    ast.all_nodes.append(zero_token)
+
     pc.node_emb = _make_list(lambda itm: emb_indexes[itm.token_type], ast.all_nodes)
     pc.node_left_c = _make_list(lambda itm: itm.left_rate, ast.all_nodes)
     pc.node_right_c = _make_list(lambda itm: itm.right_rate, ast.all_nodes)
 
-    zero_node_index = len(pc.node_emb)
-    pc.node_emb.append(emb_indexes['ZERO_EMB'])
-    pc.node_left_c.append(0.0)
-    pc.node_right_c.append(0.0)
     max_children_len = max([len(node.children) for node in ast.non_leafs])
 
     def align_nodes(_nodes):
         result = [node.index for node in _nodes]
         while len(result) != max_children_len:
-            result.append(zero_node_index)
+            result.append(zero_token.index)
         return result
 
     pc.node_children = [align_nodes(node.children) for node in ast.non_leafs]
