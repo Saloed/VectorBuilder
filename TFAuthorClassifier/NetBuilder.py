@@ -85,28 +85,20 @@ def create_convolution(params):
                 root_emb = tf.expand_dims(root_emb, 0)
 
                 root_conv = tf.matmul(root_emb, params.w['w_conv_root'])
+                left_conv = tf.matmul(children_emb, params.w['w_conv_left'])
+                right_conv = tf.matmul(children_emb, params.w['w_conv_right'])
+                combined = tf.concat([left_conv * children_l_c, right_conv * children_r_c, children_conv], 0)
+                children_conv = tf.reduce_sum(combined, 0, True)
 
-                children_emb = tf.matmul(children_emb, params.w['w_conv_emb'])
-                combined = tf.concat([children_emb, children_conv], 0)
-                combined = tf.reduce_sum(combined, 0, True)
-
-                def _combine_children(ch_w, ch_coeff):
-                    convolved = tf.matmul(combined, ch_w)
-                    return tf.multiply(convolved, ch_coeff)
-
-                left_conv = _combine_children(params.w['w_conv_left'], children_l_c)
-                right_conv = _combine_children(params.w['w_conv_right'], children_r_c)
-
-                z = tf.concat([left_conv, right_conv, root_conv], 0)
-                z = tf.reduce_sum(z, 0)
-                z = tf.add(z, params.b['b_conv'])
+                z = tf.concat([children_conv, root_conv], 0)
                 conv = tf.nn.relu(z)
+                conv = tf.reduce_max(conv, 0, True)
+
                 _convolution = _convolution.write(node_conv_index, conv)
             return _convolution, tf.add(i, 1)
 
         convolution, _ = tf.while_loop(loop_cond, convolve_subtree, [convolution, 0], parallel_iterations=1)
         return convolution.read(0), pc
-
 
 
 def create(params):
@@ -122,7 +114,7 @@ def create(params):
         convolution = tf.concat(convolutions, axis=0, name='convolution')
     target = tf.concat(targets, axis=0, name='target')
     with tf.name_scope('Hidden'):
-        hid_layer = tf.nn.relu(tf.matmul(convolution, params.w['w_hid']) + params.b['b_hid'])
+        hid_layer = tf.nn.sigmoid(tf.matmul(convolution, params.w['w_hid']) + params.b['b_hid'])
         dropout_prob = tf.placeholder(tf.float32)
         hid_layer = tf.nn.dropout(hid_layer, dropout_prob)
     with tf.name_scope('Out'):
