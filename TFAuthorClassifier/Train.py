@@ -29,8 +29,18 @@ def process_set(batches, fun, is_train, session):
     return loss, loss_max, err
 
 
+def write_parameters(path):
+    from TFAuthorClassifier import TFParameters
+    params = dir(TFParameters)
+    param_names = [v for v in params if v.isupper() and len(v) > 1]
+    param_values = [getattr(TFParameters, v) for v in param_names]
+    param_str = '\n'.join(('{0} = {1}'.format(p[0], p[1]) for p in zip(param_names, param_values)))
+    with open(path + 'parameters.txt', 'w') as f:
+        f.write(param_str)
+
+
 def main():
-    with open('Dataset/intellij_data_set_100_100', 'rb') as f:
+    with open('Dataset/platform_data_set_100_100', 'rb') as f:
         # with open('TFAuthorClassifier/test_data_data', 'rb') as f:
         data_set = P.load(f)  # type: DataSet
     params, emb_indexes = init_params(data_set.amount)
@@ -38,17 +48,17 @@ def main():
 
     train_set = generate_batches(data_set.train, emb_indexes, data_set.r_index, net, DROPOUT)
     test_set = generate_batches(data_set.valid, emb_indexes, data_set.r_index, net, 1.0)
-
     current_date = datetime.datetime.now()
     current_date = '{}_{}_{}'.format(current_date.day, current_date.month, current_date.year)
-    base_path = 'Results/idea_100_test_adam_{}/'.format(current_date)
+    base_path = 'Results/platform_tree_400_{}/'.format(current_date)
     if not os.path.exists(base_path):
         os.makedirs(base_path)
+    write_parameters(base_path)
     for retry_num in range(NUM_RETRY):
         save_path = base_path + 'retry_{}/'.format(retry_num)
         if not os.path.exists(save_path):
             os.makedirs(save_path)
-        logger = logging.getLogger('NetLogger')
+        logger = logging.getLogger('NetLogger_{}'.format(retry_num))
         logger.addHandler(logging.FileHandler(base_path + 'log_{}.txt'.format(retry_num)))
         logger.addHandler(logging.StreamHandler(sys.stdout))
         logger.setLevel(logging.INFO)
@@ -82,6 +92,9 @@ def main():
                     update_figure(plot, plot_axes, train_epoch, te_loss, tr_loss)
                     info = sess.run(fetches=summaries)
                     summary_writer.add_summary(info, train_epoch)
+            except Exception as ex:
+                logger.error(str(ex))
+                logger.error(str(ex.__traceback__))
             finally:
                 save_to_file(plot, base_path + 'error_{}.png'.format(retry_num))
                 summary_writer.close()
