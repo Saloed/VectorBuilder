@@ -50,7 +50,7 @@ def main():
     test_set = generate_batches(data_set.valid, emb_indexes, data_set.r_index, net, 1.0)
     current_date = datetime.datetime.now()
     current_date = '{}_{}_{}'.format(current_date.day, current_date.month, current_date.year)
-    base_path = 'Results/platform_tree_400_{}/'.format(current_date)
+    base_path = 'Results/platform_parallel_400_{}/'.format(current_date)
     if not os.path.exists(base_path):
         os.makedirs(base_path)
     write_parameters(base_path)

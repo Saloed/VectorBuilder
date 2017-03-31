@@ -6,10 +6,10 @@ import tensorflow as tf
 
 LEARN_RATE = 0.07  # 0.001
 L2_PARAM = 5.e-5
-DROPOUT = 0.5
+DROPOUT = 0.8
 NUM_FEATURES = 100
 NUM_CONVOLUTION = 400
-NUM_HIDDEN = 40
+NUM_HIDDEN = 100
 SAVE_PERIOD = 20
 BATCH_SIZE = 20
 NUM_RETRY = 200
@@ -28,7 +28,8 @@ class Params:
 def rand_weight(shape_0, shape_1, name, params: dict):
     with tf.name_scope(name):
         var = tf.Variable(
-            tf.truncated_normal(shape=[shape_1, shape_0], stddev=RANDOM_RANGE),
+            tf.random_uniform([shape_1, shape_0], -RANDOM_RANGE, RANDOM_RANGE),
+            # tf.truncated_normal(shape=[shape_1, shape_0], stddev=RANDOM_RANGE),
             name=name)
         variable_summaries(var)
         params[name] = var
