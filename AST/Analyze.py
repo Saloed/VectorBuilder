@@ -32,8 +32,8 @@ def process_ast(ast):
     return Nodes(root_node, all_nodes, non_leafs)
 
 
-if __name__ == '__main__':
-    repo_path = "Dataset/intellij-community/"
+def process_repo(repo_name):
+    repo_path = repo_name + '/'
     analyzer, gateway, process = analyzer_init()
     analyzer_data = analyzer.analyzeRepo(repo_path)
     print('End data generation')
@@ -43,7 +43,12 @@ if __name__ == '__main__':
             d = process_ast(ast)
             data.append(d)
         print('Constructed {} / {}'.format(i, len(analyzer_data)))
-    with open('Dataset/intellij_file', 'wb') as f:
+    with open(repo_name + '_file', 'wb') as f:
         P.dump(data, f)
     gateway.shutdown()
     process.terminate()
+
+
+if __name__ == '__main__':
+    arg = sys.argv[1]
+    process_repo(arg)
