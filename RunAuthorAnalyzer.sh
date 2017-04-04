@@ -15,5 +15,5 @@ declare -a arr=("Dataset/TestRepos/aws-sdk-java"
 
 for i in "${arr[@]}"
 do
-    python $DIR/AST/Analyze.py ${i}
+    python ${DIR}/AST/Analyze.py ${i}
 done

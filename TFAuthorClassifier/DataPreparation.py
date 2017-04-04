@@ -56,10 +56,11 @@ def make_data_file(filename, min_tokens, max_child_tokens):
         return process_node(method.root_node)
 
     new_data_set = [
-        ([m for m in methods if len(m.all_nodes) > min_tokens
+        ([m for m in methods
+          if len(m.all_nodes) > min_tokens
           and check_for_error(m)
-          and check_max_len(m, max_child_tokens)], author)
-        for methods, author in data_set]
+          and check_max_len(m, max_child_tokens)
+          ], author) for methods, author in data_set]
 
     new_data_set.sort(key=lambda x: len(x[0]), reverse=True)
 
@@ -70,17 +71,17 @@ def make_data_file(filename, min_tokens, max_child_tokens):
 
 
 def main():
-    with open('Dataset/TestRepos/hadoop_file_100_100', 'rb') as f:
+    with open('Dataset/TestRepos/mesquite_file_100_100', 'rb') as f:
         # with open('TFAuthorClassifier/test_data', 'rb') as f:
         dataset = P.load(f)
-    dataset = dataset[:5]
+    dataset = dataset[:4]
     indexes = range(len(dataset))
     authors = [(i, dataset[i][1]) for i in indexes]
     authors_amount, r_index = build_vectors(authors)
     batches = {i: dataset[i][0] for i in indexes}
-    train_set, valid_set, test_set = divide_data_set(batches, 700, 100, 200)
+    train_set, valid_set, test_set = divide_data_set(batches, 5000, 600, 1000)
     dataset = DataSet(test_set, valid_set, train_set, r_index, authors_amount)
-    with open('Dataset/TestRepos/hadoop_data_set', 'wb') as f:
+    with open('Dataset/TestRepos/mesquite_data_set', 'wb') as f:
         # with open('TFAuthorClassifier/test_data_data', 'wb') as f:
         P.dump(dataset, f)
 
