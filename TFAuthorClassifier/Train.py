@@ -40,7 +40,7 @@ def write_parameters(path):
 
 
 def main():
-    with open('Dataset/platform_data_set_100_100', 'rb') as f:
+    with open('Dataset/TestRepos/mesquite_data_set', 'rb') as f:
         # with open('TFAuthorClassifier/test_data_data', 'rb') as f:
         data_set = P.load(f)  # type: DataSet
     params, emb_indexes = init_params(data_set.amount)
@@ -50,7 +50,7 @@ def main():
     test_set = generate_batches(data_set.valid, emb_indexes, data_set.r_index, net, 1.0)
     current_date = datetime.datetime.now()
     current_date = '{}_{}_{}'.format(current_date.day, current_date.month, current_date.year)
-    base_path = 'Results/platform_tree_400_{}/'.format(current_date)
+    base_path = 'Results/mesquite_tree_500_{}/'.format(current_date)
     if not os.path.exists(base_path):
         os.makedirs(base_path)
     write_parameters(base_path)
