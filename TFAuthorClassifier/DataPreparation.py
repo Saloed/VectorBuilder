@@ -71,17 +71,17 @@ def make_data_file(filename, min_tokens, max_child_tokens):
 
 
 def main():
-    with open('Dataset/TestRepos/mesquite_file_100_100', 'rb') as f:
+    with open('Dataset/TestRepos/cloudstack_file_100_100', 'rb') as f:
         # with open('TFAuthorClassifier/test_data', 'rb') as f:
         dataset = P.load(f)
-    dataset = dataset[:4]
+    dataset = dataset[:3]
     indexes = range(len(dataset))
     authors = [(i, dataset[i][1]) for i in indexes]
     authors_amount, r_index = build_vectors(authors)
     batches = {i: dataset[i][0] for i in indexes}
-    train_set, valid_set, test_set = divide_data_set(batches, 5000, 600, 1000)
+    train_set, valid_set, test_set = divide_data_set(batches, 300, 100, 200)
     dataset = DataSet(test_set, valid_set, train_set, r_index, authors_amount)
-    with open('Dataset/TestRepos/mesquite_data_set', 'wb') as f:
+    with open('Dataset/TestRepos/cloudstack_data_set', 'wb') as f:
         # with open('TFAuthorClassifier/test_data_data', 'wb') as f:
         P.dump(dataset, f)
 

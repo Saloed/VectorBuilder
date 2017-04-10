@@ -5,8 +5,9 @@ from sklearn.metrics import confusion_matrix, precision_recall_fscore_support
 
 
 class ConfMatrix:
-    def __init__(self, classes):
+    def __init__(self, classes, file_name):
         self.classes = classes
+        self.file_name = file_name
         self._conf_mat = None
         self._data = None
         self._predicted = []
@@ -57,4 +58,5 @@ class ConfMatrix:
         plt.tight_layout()
         plt.ylabel('Actual class')
         plt.xlabel('Predicted class')
+        plt.savefig(self.file_name + 'conf_matrix.png')
         plt.show()
