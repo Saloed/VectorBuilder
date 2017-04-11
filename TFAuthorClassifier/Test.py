@@ -11,11 +11,11 @@ from Utils.ConfMatrix import ConfMatrix
 
 
 def main():
-    model_name = 'Results/cloudstack_parallel_400_10_4_2017/retry_0/model-7'
-    test_name = 'Results/cloudstack_test/'
+    model_name = 'Results/idea_tf_adam_20_3_2017/retry_6/model-46'
+    test_name = 'Results/idea_test/'
     if not os.path.exists(test_name):
         os.makedirs(test_name)
-    with open('Dataset/TestRepos/cloudstack_data_set', 'rb') as f:
+    with open('Dataset/intellij_data_set_100_100', 'rb') as f:
         # with open('TFAuthorClassifier/test_data_data', 'rb') as f:
         data_set = P.load(f)  # type: DataSet
     params, emb_indexes = init_params(data_set.amount)
