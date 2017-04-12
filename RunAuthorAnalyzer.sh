@@ -6,12 +6,7 @@ export PYTHONPATH
 
 declare -a arr=("Dataset/TestRepos/aws-sdk-java"
              "Dataset/TestRepos/camel"
-             "Dataset/TestRepos/cloudstack"
-             "Dataset/TestRepos/consulo"
-             "Dataset/TestRepos/eclipselink.runtime"
-             "Dataset/TestRepos/FinanceAnalytics"
-             "Dataset/TestRepos/MesquiteArchive"
-             "Dataset/TestRepos/ppwcode")
+             "Dataset/TestRepos/consulo")
 
 for i in "${arr[@]}"
 do

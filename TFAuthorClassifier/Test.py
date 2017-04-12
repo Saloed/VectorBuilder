@@ -11,11 +11,11 @@ from Utils.ConfMatrix import ConfMatrix
 
 
 def main():
-    model_name = 'Results/idea_tf_adam_20_3_2017/retry_6/model-46'
-    test_name = 'Results/idea_test/'
+    model_name = 'Results/camel_parallel_400_12_4_2017/retry_0/model-21'
+    test_name = 'Results/camel_test/'
     if not os.path.exists(test_name):
         os.makedirs(test_name)
-    with open('Dataset/intellij_data_set_100_100', 'rb') as f:
+    with open('Dataset/TestRepos/camel_data_set', 'rb') as f:
         # with open('TFAuthorClassifier/test_data_data', 'rb') as f:
         data_set = P.load(f)  # type: DataSet
     params, emb_indexes = init_params(data_set.amount)

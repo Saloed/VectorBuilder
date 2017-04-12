@@ -2,15 +2,6 @@ import _pickle as P
 from collections import namedtuple
 from random import shuffle
 
-from AST.GitAuthor import get_repo_methods_with_authors
-
-
-def generate_author_file():
-    data_set = get_repo_methods_with_authors('../Dataset/intellij-community/')
-    # data_set = get_single_author_data('../Dataset/OneAuthorProjects/distributedlog/')
-    with open('../Dataset/author_file_intellij', 'wb') as f:
-        P.dump(data_set, f)
-
 
 def divide_data_set(data_set, train_units, valid_units, test_units):
     data_set = list(zip(*data_set.values()))
@@ -71,17 +62,17 @@ def make_data_file(filename, min_tokens, max_child_tokens):
 
 
 def main():
-    with open('Dataset/TestRepos/cloudstack_file_100_100', 'rb') as f:
+    with open('Dataset/TestRepos/FF/consulo_file_100_100', 'rb') as f:
         # with open('TFAuthorClassifier/test_data', 'rb') as f:
         dataset = P.load(f)
-    dataset = dataset[:3]
+    dataset = dataset[:5]
     indexes = range(len(dataset))
     authors = [(i, dataset[i][1]) for i in indexes]
     authors_amount, r_index = build_vectors(authors)
     batches = {i: dataset[i][0] for i in indexes}
-    train_set, valid_set, test_set = divide_data_set(batches, 300, 100, 200)
+    train_set, valid_set, test_set = divide_data_set(batches, 600, 100, 300)
     dataset = DataSet(test_set, valid_set, train_set, r_index, authors_amount)
-    with open('Dataset/TestRepos/cloudstack_data_set', 'wb') as f:
+    with open('Dataset/TestRepos/consulo_data_set', 'wb') as f:
         # with open('TFAuthorClassifier/test_data_data', 'wb') as f:
         P.dump(dataset, f)
 
