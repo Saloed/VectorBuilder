@@ -2,7 +2,7 @@ import _pickle as P
 import sys
 from os import walk
 
-from AST.Utils import analyzer_init, process_ast, author_collapse
+from AST.Utility import analyzer_init, process_ast, author_collapse
 
 
 def get_all_available_tokens() -> list:
@@ -66,5 +66,6 @@ def process_repo(repo_name):
 
 
 if __name__ == '__main__':
-    arg = sys.argv[1]
-    process_repo(arg)
+    build_psi_text(['Dataset/intellij-community'], 'tmp_result.hlam')
+    # arg = sys.argv[1]
+    # process_repo(arg)
