@@ -25,16 +25,16 @@ class ConfMatrix:
         cm = confusion_matrix(self._actual, self._predicted)
         self._conf_mat = cm.astype(np.float32) / cm.sum(axis=1)[:, np.newaxis]
         p, r, f, _ = precision_recall_fscore_support(self._actual, self._predicted)
-        self._data = (p, r, f)
+        self._data = (p, r, f, [np.mean(f)])
         return p, r, f
 
     def __str__(self):
         if self._conf_mat is not None and self._data is not None:
-            labels = ['Precision', 'Recall\t', 'F-Score\t']
+            labels = ['Precision', 'Recall\t', 'F-Score\t', 'Avg F-Score\t']
             return '\n'.join([
                 'Confusion Matrix',
                 str(self._conf_mat),
-                *('\t'.join([label, *('{0} : {1:.3f} | '.format(i, v) for i, v in enumerate(self._data[j]))])
+                *('\t'.join([label, *('{0:.3f} & '.format(v) for i, v in enumerate(self._data[j]))])
                   for j, label in enumerate(labels))
             ])
         else:
