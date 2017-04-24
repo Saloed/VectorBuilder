@@ -1,5 +1,4 @@
-from AST.Token import Token
-from AST.Tokenizer import Nodes
+from AST.Structures import Token, Nodes
 from TFAuthorClassifier.NetBuilder import Placeholders
 from TFAuthorClassifier.TFParameters import BATCH_SIZE
 

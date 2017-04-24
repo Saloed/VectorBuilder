@@ -1,39 +1,52 @@
-import subprocess
-
-import sys
 import _pickle as P
-import time
-from py4j.java_gateway import GatewayParameters, JavaGateway, get_field
+import sys
+from os import walk
 
-from AST.Tokenizer import _parse_tree, tree_to_list, Nodes, Author
-
-
-def analyzer_init(port=None):
-    if port is None:
-        port = 25537
-    process = subprocess.Popen(
-        ["java", "-jar", "AST/AuthorAnalyzer.jar", str(port)],
-        stdout=sys.stdout, stderr=sys.stderr)
-    time.sleep(1)
-    parameters = GatewayParameters(port=port)
-    gateway = JavaGateway(gateway_parameters=parameters)
-    analyzer = gateway.entry_point.getMain()
-    return analyzer, gateway, process
+from AST.Utility import analyzer_init, process_ast, author_collapse
 
 
-def process_ast(ast):
-    root_node = _parse_tree(ast)
-    author = get_field(ast, 'author')
-    if author is not None:
-        author = Author(get_field(author, 'name'), get_field(author, 'email'))
-        root_node.author = author
-    all_nodes = tree_to_list(root_node)
-    non_leafs = [node for node in all_nodes if not node.is_leaf]
-    return Nodes(root_node, all_nodes, non_leafs)
+def get_all_available_tokens() -> list:
+    parser, gateway, process = analyzer_init()
+    tokens = parser.getAllAvailableTokens()
+    result = [str(token) for token in tokens]
+    gateway.shutdown()
+    process.terminate()
+    return result
 
 
-if __name__ == '__main__':
-    repo_path = "Dataset/intellij-community/"
+def build_psi_text(data_set_dirs, result_name):
+    analyzer, gateway, process = analyzer_init()
+    files = []
+    for data_set_dir in data_set_dirs:
+        files.extend(parse_directory(data_set_dir, []))
+    psi_text_file = []
+    for file in files:
+        try:
+            print(file)
+            psi_text = str(analyzer.parsePSIText(file))
+            psi_text_file.append(psi_text)
+        except Exception as ex:
+            print(ex)
+            continue
+    print('end ast building')
+    delimiter = 'WHITE_SPACE ' * 5 + '\n'
+    text = delimiter.join(psi_text_file)
+    gateway.shutdown()
+    process.terminate()
+    with open(result_name, 'w') as text_file:
+        text_file.write(text)
+
+
+def parse_directory(directory, f: list):
+    for (dir_path, dir_names, file_names) in walk(directory):
+        full_file_names = [dir_path + '/' + filename for filename in file_names if
+                           filename.endswith('.java')]
+        f.extend(full_file_names)
+    return f
+
+
+def process_repo(repo_name):
+    repo_path = repo_name + '/'
     analyzer, gateway, process = analyzer_init()
     analyzer_data = analyzer.analyzeRepo(repo_path)
     print('End data generation')
@@ -43,7 +56,16 @@ if __name__ == '__main__':
             d = process_ast(ast)
             data.append(d)
         print('Constructed {} / {}'.format(i, len(analyzer_data)))
-    with open('Dataset/intellij_file', 'wb') as f:
+    authors = list({m.root_node.author for m in data})
+    uauthors = author_collapse(authors)
+    data = [([m for m in data if m.root_node.author in ua], ua) for ua in uauthors]
+    with open(repo_name + '_file', 'wb') as f:
         P.dump(data, f)
     gateway.shutdown()
     process.terminate()
+
+
+if __name__ == '__main__':
+    build_psi_text(['Dataset/intellij-community'], 'tmp_result.hlam')
+    # arg = sys.argv[1]
+    # process_repo(arg)

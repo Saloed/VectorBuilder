@@ -1,3 +1,26 @@
+from collections import namedtuple
+
+Nodes = namedtuple('Nodes', ['root_node', 'all_nodes', 'non_leafs'])
+
+
+class Author:
+    def __init__(self, name, email):
+        self.name = name
+        self.email = email
+
+    def __eq__(self, other):
+        return self.name == other.name or self.email == other.email
+
+    def __hash__(self):
+        return 17 * hash(self.name) + 31 * hash(self.email)
+
+    def __str__(self):
+        return '{} <{}>'.format(self.name, self.email)
+
+    def __repr__(self):
+        return '{} <{}>'.format(self.name, self.email)
+
+
 class Token:
     def __init__(self, token_type, parent, is_leaf, pos=0, start_line=None, end_line=None, author=None):
         self.token_type = token_type
