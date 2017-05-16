@@ -40,9 +40,9 @@ def write_parameters(path):
 
 
 def main():
-    with open('Dataset/TestRepos/consulo_data_set', 'rb') as f:
+    with open('Dataset/TestRepos/cloudstack_data_set', 'rb') as f:
         # with open('TFAuthorClassifier/test_data_data', 'rb') as f:
-        data_set = P.load(f)  # type: DataSet
+        data_set = P.load(f)
     params, emb_indexes = init_params(data_set.amount)
     updates, net, summaries = build_net(params)
 
@@ -50,7 +50,7 @@ def main():
     test_set = generate_batches(data_set.valid, emb_indexes, data_set.r_index, net, 1.0)
     current_date = datetime.datetime.now()
     current_date = '{}_{}_{}'.format(current_date.day, current_date.month, current_date.year)
-    base_path = 'Results/consulo_tree_400_{}/'.format(current_date)
+    base_path = 'Results/cloudstack_tree_400_{}/'.format(current_date)
     if not os.path.exists(base_path):
         os.makedirs(base_path)
     write_parameters(base_path)
